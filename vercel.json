@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/batch",
+      "schedule": "0 11 * * *"
+    }
+  ]
+}
