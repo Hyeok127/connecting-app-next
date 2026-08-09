@@ -1,6 +1,6 @@
 #!/bin/bash
 # 서버 시작 → 스모크 테스트 → 종료 (단일 세션에서 수행)
-cd /home/jsh/connecting-app-next || exit 1
+cd "$(dirname "$0")/.." || exit 1
 export NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 export NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy
 export SUPABASE_SERVICE_ROLE_KEY=dummy
