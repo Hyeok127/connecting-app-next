@@ -19,7 +19,9 @@ gh api repos/Hyeok127/connecting-app-next/deployments \
 ```
 
 앱 코드가 아닌 파일(`scripts/`, 문서 등)만 고쳐도 배포는 트리거된다 — 빌드 산출물이
-같아서 동작은 안 바뀌지만, "푸시했으니 배포됐다"를 항상 전제할 것. 실사용자가 있는
+같아서 동작은 안 바뀌지만, "푸시했으니 배포됐다"를 항상 전제할 것. (Apsorb도 데스크탑이
+10분마다 pull해 새 코드로 크론을 돌리므로 "push = 운영 반영"인 건 같다. 다른 건 지연시간과
+**영향 범위** — 여기는 실사용자가 쓰는 웹서비스라 잘못된 배포가 곧 장애다.) 실사용자가 있는
 서비스이므로 `app/`·`lib/`·`components/`를 고칠 땐 push 전에 `npm run build`와
 `scripts/smoke_run.sh`를 반드시 통과시킨다.
 
@@ -34,9 +36,11 @@ gh api repos/Hyeok127/connecting-app-next/deployments \
 | Desktop (`Desktop_rtx2060_wsl`) | 체크아웃 + Vercel 링크 | Node 22.22.2, `.vercel/` 보유, crontab이 10분마다 `git pull` |
 | GB5 (`laptop_GB5_wsl`) | 체크아웃만 | **node 미설치 — 빌드·실행 불가**. 코드 열람용 |
 
-- **Apsorb와 달리 로컬 DB도 SSH 터널도 없다.** 데이터는 전부 Supabase 호스팅이라
-  어느 기기에서 개발하든 같은 원격 DB를 본다 — 즉 **로컬 개발도 실데이터를 건드린다.**
-  Apsorb 감각으로 "노트북이니 안전하겠지" 생각하면 안 된다.
+- **로컬 DB도 SSH 터널도 없다.** 데이터는 전부 Supabase 호스팅이라 어느 기기에서
+  개발하든 같은 원격 DB를 본다 — 즉 **로컬 개발이 곧 실데이터 조작이다.** 참고로 이건
+  Apsorb도 마찬가지다(노트북의 `127.0.0.1:5433` 터널이 데스크탑 운영 DB로 그대로 연결된다).
+  차이는 안전성이 아니라 **자각 가능성**이다 — Apsorb는 터널을 띄우는 명시적 동작이 있어
+  "지금 운영 DB를 보고 있다"가 눈에 보이는 반면, 여기선 URL만으로 조용히 붙는다.
 - 데스크탑의 `*/10 * * * *` git pull은 코드 최신화용일 뿐, 이 프로젝트를 **실행하는
   크론은 데스크탑에 없다**(Apsorb와 다른 점). 실제 스케줄 실행은 Vercel과 Supabase가 한다.
 - `.vercel/`은 gitignore 대상이라 데스크탑에만 있다. nt9는 Vercel에 링크돼 있지 않지만,
