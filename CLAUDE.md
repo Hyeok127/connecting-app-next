@@ -25,6 +25,22 @@ gh api repos/Hyeok127/connecting-app-next/deployments \
 서비스이므로 `app/`·`lib/`·`components/`를 고칠 땐 push 전에 `npm run build`와
 `scripts/smoke_run.sh`를 반드시 통과시킨다.
 
+## 브랜치 전략 — 평소 작업은 `dev`에서 (2026-08-09 도입)
+
+위 문제 때문에 **push와 배포를 분리**했다.
+
+| 브랜치 | 용도 | push하면 |
+|---|---|---|
+| `dev` | **평소 작업·커밋은 전부 여기** | Vercel **Preview** 배포 (실사용자 무영향) |
+| `main` | 릴리스 전용 | Vercel **Production** 배포 |
+
+- 릴리스는 `dev` → `main` 머지로 한다. **`main`에 직접 커밋하지 않는다.**
+- GitHub 기본 브랜치는 `main`으로 그대로 뒀다 — 기본 브랜치를 `dev`로 바꾸면 Vercel이
+  Production 대상 브랜치를 따라 옮길 수 있어서다(그러면 정반대가 된다).
+- 데스크탑 crontab의 `git pull origin main`도 그대로다. 데스크탑 체크아웃은 운영 코드를
+  미러링하는 용도라 `main`을 보는 게 맞다. **즉 dev에만 있는 변경은 데스크탑에 안 내려간다.**
+- 2026-08-09 실측: `dev` push(`238a01e`) → `Preview` 배포 생성, Production 무변동 확인.
+
 ## 기기 배치 (2026-08-09 기준)
 
 기기 이름 체계는 Apsorb의 `CLAUDE.md`와 동일하다(`desktop-rtx2060-wsl`, `laptop-gb5-wsl`,
