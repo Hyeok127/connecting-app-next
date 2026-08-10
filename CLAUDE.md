@@ -91,6 +91,12 @@ Supabase 프로젝트가 두 개다. **둘 다 같은 조직(Hyeok127's Org) 안
 - 데스크탑의 `.env.local`과 Vercel 환경변수는 운영 프로젝트 그대로다.
 - 운영/DEV 구분 확인법: `grep "^NEXT_PUBLIC_SUPABASE_URL" .env.local` — `vnwk...`면 dev,
   `pcox...`면 운영.
+- **dev 시드 계정**: `dev-root` (bridge·admin, PIN `123456`, 초대코드 `DEVROOT9`) —
+  가입에는 기존 유저의 초대코드가 필수(R1)라서 빈 DB에 직접 insert로 심어둔 계정이다.
+  dev 전용이며 운영과 무관하다. 새 가입 테스트는 초대코드 `DEVROOT9`로 하면 된다.
+- **E2E 검증 이력(2026-08-10, nt9)**: `PORT=3210 npx next dev` 기동 후 실제 dev DB 대상
+  가입(200, 토큰 발급) → 잘못된 초대코드 거부(400) → 로그인(200) → `/api/me` 세션
+  인증(200)까지 전부 통과. 즉 dev 프로젝트로 개발 서버 + 가입/인증 플로우가 완전 동작한다.
 
 ## 환경변수
 
