@@ -48,15 +48,14 @@ gh api repos/Hyeok127/connecting-app-next/deployments \
 
 | 기기 | 상태 | 비고 |
 |---|---|---|
-| **nt9** (`laptop_nt9_wsl`) | **개발 주력** | Node 22.22.2, `npm ci` 완료, `.env.local` 있음, 레거시 2종 보유 |
+| **nt9** (`laptop_nt9_wsl`) | **개발 주력** | Node 22.22.2, `npm ci` 완료, `.env.local`은 **dev 프로젝트** 지향, 레거시 2종 보유 |
 | Desktop (`Desktop_rtx2060_wsl`) | 체크아웃 + Vercel 링크 | Node 22.22.2, `.vercel/` 보유, crontab이 10분마다 `git pull` |
 | GB5 (`laptop_GB5_wsl`) | 체크아웃만 | **node 미설치 — 빌드·실행 불가**. 코드 열람용 |
 
-- **로컬 DB도 SSH 터널도 없다.** 데이터는 전부 Supabase 호스팅이라 어느 기기에서
-  개발하든 같은 원격 DB를 본다 — 즉 **로컬 개발이 곧 실데이터 조작이다.** 참고로 이건
-  Apsorb도 마찬가지다(노트북의 `127.0.0.1:5433` 터널이 데스크탑 운영 DB로 그대로 연결된다).
-  차이는 안전성이 아니라 **자각 가능성**이다 — Apsorb는 터널을 띄우는 명시적 동작이 있어
-  "지금 운영 DB를 보고 있다"가 눈에 보이는 반면, 여기선 URL만으로 조용히 붙는다.
+- **로컬 DB도 SSH 터널도 없다.** 데이터는 전부 Supabase 호스팅이다. **어느 프로젝트를
+  보는지는 순전히 `.env.local`의 URL이 결정한다** — URL만으로 조용히 붙기 때문에,
+  자기가 지금 운영을 보는지 dev를 보는지 파일을 열기 전엔 알 수 없다. 아래
+  "dev/prod 데이터 분리" 참고.
 - 데스크탑의 `*/10 * * * *` git pull은 코드 최신화용일 뿐, 이 프로젝트를 **실행하는
   크론은 데스크탑에 없다**(Apsorb와 다른 점). 실제 스케줄 실행은 Vercel과 Supabase가 한다.
 - `.vercel/`은 gitignore 대상이라 데스크탑에만 있다. nt9는 Vercel에 링크돼 있지 않지만,
@@ -72,6 +71,26 @@ gh api repos/Hyeok127/connecting-app-next/deployments \
 
 스케줄을 바꿀 땐 **어느 쪽 소관인지 먼저 확인할 것.** 마이그레이션 파일을 고쳐도
 Supabase에 적용(SQL Editor 실행)하지 않으면 반영되지 않고, `vercel.json`은 push해야 반영된다.
+
+## dev/prod 데이터 분리 (2026-08-10 도입)
+
+Supabase 프로젝트가 두 개다. **둘 다 같은 조직(Hyeok127's Org) 안에 있으니 대시보드에서
+반드시 이름·ref를 확인하고 작업할 것.**
+
+| 용도 | 대시보드 이름 | ref (URL 호스트 앞부분) | 리전 |
+|---|---|---|---|
+| **운영** — 실사용자 데이터 | Connecting | `pcoxykeecgfrdbhynnae` | Seoul |
+| **dev** — 개발·실험용 | Hyeok127's Project | `vnwkxkopnpyhabjfclpb` | Singapore |
+
+- dev 프로젝트에는 운영과 동일한 마이그레이션(001~003)이 적용돼 있다(2026-08-10, 테이블
+  10개·pg_cron 잡 2개·RPC 함수·photos 버킷 확인 완료). 스키마를 바꿀 땐 **양쪽 모두**
+  적용해야 한다 — 마이그레이션 파일 추가 후 dev에서 먼저 실행·검증하고 운영에 적용.
+- **nt9의 `.env.local`은 dev 프로젝트를 가리킨다.** 운영값은 같은 파일 안에 `# prod #`
+  주석으로 보존돼 있고, 전환은 주석 토글로 한다(원본 백업: `.env.local.prod.bak`).
+  운영 데이터를 봐야 할 일이 생기면 토글하되, 끝나면 반드시 dev로 되돌릴 것.
+- 데스크탑의 `.env.local`과 Vercel 환경변수는 운영 프로젝트 그대로다.
+- 운영/DEV 구분 확인법: `grep "^NEXT_PUBLIC_SUPABASE_URL" .env.local` — `vnwk...`면 dev,
+  `pcox...`면 운영.
 
 ## 환경변수
 
