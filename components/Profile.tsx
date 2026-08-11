@@ -312,8 +312,8 @@ export function Profile() {
       <div className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
         <h3 className="mb-3 font-display font-semibold text-ink">계정 관리</h3>
         <form onSubmit={saveEmail} className="mb-5 space-y-2 border-b border-line pb-4">
-          <p className="text-sm font-medium text-ink-soft">알림 이메일</p>
-          <p className="text-xs text-ink-faint">새 매칭·매칭 성사 소식을 이메일로 받아요. 비우면 알림을 끕니다.</p>
+          <p className="text-sm font-medium text-ink-soft">알림 이메일 <span className="text-ink-faint">(준비 중)</span></p>
+          <p className="text-xs text-ink-faint">지금은 앱 안에서 새 매칭을 알려드려요. 이메일을 남겨두면 이메일 알림이 켜질 때 바로 받아볼 수 있어요.</p>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}

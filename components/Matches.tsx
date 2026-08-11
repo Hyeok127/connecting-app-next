@@ -79,6 +79,7 @@ export function Matches() {
         const fresh = m.matches.filter((x) => !seenSet.has(x.id)).map((x) => x.id);
         setNewIds(new Set(fresh));
         localStorage.setItem("seen_match_ids", JSON.stringify(m.matches.map((x) => x.id)));
+        window.dispatchEvent(new Event("notifs:refresh")); // 방금 다 봤으니 헤더 배지 갱신(점 제거)
       }
     } finally {
       setLoading(false);
@@ -98,6 +99,7 @@ export function Matches() {
       toast(data.state === "accepted" ? "매칭이 성사됐어요. 연락처를 확인하세요." : "응답했어요.");
       await refresh();
       load();
+      window.dispatchEvent(new Event("notifs:refresh")); // 응답 반영해 헤더 배지 감소
     } catch (err) {
       toast((err as Error).message);
     }
