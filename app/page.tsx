@@ -1,25 +1,8 @@
-"use client";
-import { Suspense, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/AuthProvider";
-import { AuthPage } from "@/components/AuthPage";
-import { Spinner } from "@/components/ui";
+import { Landing } from "@/components/Landing";
+
+// 프리렌더 캐시(s-maxage 1년)로 옛 화면이 남는 걸 막기 위해 동적 렌더로 고정.
+export const dynamic = "force-dynamic";
 
 export default function RootPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-    if (user) router.replace(user.role === "member" ? "/home" : "/bridge");
-  }, [user, loading, router]);
-
-  if (loading) return <Spinner />;
-  if (user) return <Spinner />;
-
-  return (
-    <Suspense fallback={<Spinner />}>
-      <AuthPage />
-    </Suspense>
-  );
+  return <Landing />;
 }
