@@ -3,6 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authFromToken, bearerToken } from "@/lib/auth";
 import { ok, fail, unauthorized } from "@/lib/http";
 import { genId, nowMs } from "@/lib/utils";
+import { clientIp, ipAllowed } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,9 @@ const REPORT_REASONS = ["부적절한 프로필", "부적절한 사진", "불쾌
 export async function POST(req: NextRequest) {
   const user = await authFromToken(bearerToken(req));
   if (!user) return unauthorized();
+  // 신고/차단 행 무제한 삽입 방지(point_events는 추천·관리자 화면이 스캔하는 테이블)
+  if (!(await ipAllowed("moderation", clientIp(req), 30)))
+    return fail("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", 429);
 
   let body: Record<string, unknown>;
   try {

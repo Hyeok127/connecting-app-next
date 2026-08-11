@@ -1,14 +1,15 @@
 import type { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabase } from "@/lib/supabase";
-import { authFromToken, bearerToken } from "@/lib/auth";
+import { authFromToken, bearerToken, revokeSessions } from "@/lib/auth";
 import { ok, fail, unauthorized } from "@/lib/http";
 
 export const runtime = "nodejs";
 
 // PIN 변경: 현재 PIN 확인 후 새 PIN(숫자 6자리)으로 교체.
 export async function POST(req: NextRequest) {
-  const user = await authFromToken(bearerToken(req));
+  const token = bearerToken(req);
+  const user = await authFromToken(token);
   if (!user) return unauthorized();
 
   let body: Record<string, unknown>;
@@ -28,5 +29,7 @@ export async function POST(req: NextRequest) {
     .update({ pin_hash: bcrypt.hashSync(next, 10) })
     .eq("id", user.id);
   if (error) return fail(error.message, 400);
+  // 계정 탈취를 의심해 PIN을 바꾼 경우를 대비: 현재 기기 외 세션은 전부 파기한다.
+  await revokeSessions(user.id, token ?? undefined);
   return ok({ ok: true });
 }

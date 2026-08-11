@@ -38,15 +38,6 @@ export function Home() {
   const [loading, setLoading] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
 
-  // 온보딩: 첫 로그인 때 이용 안내를 한 번 자동으로 띄운다(localStorage 플래그).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!localStorage.getItem("onboarded_v1")) {
-      setShowGuide(true);
-      localStorage.setItem("onboarded_v1", "1");
-    }
-  }, []);
-
   const load = useCallback(async () => {
     try {
       const [rec, rank] = await Promise.all([
@@ -56,6 +47,12 @@ export function Home() {
       setCandidates(rec.candidates);
       setRanking(rank.ranking.map((r) => r.target.id));
       setConfirmedToday(rank.confirmed_today);
+      // 온보딩: 첫 방문이면 이용 안내를 한 번 띄운다(localStorage 플래그).
+      // 데이터를 받은 뒤 띄워야 빈 화면 위로 모달이 먼저 뜨지 않는다.
+      if (typeof window !== "undefined" && !localStorage.getItem("onboarded_v1")) {
+        localStorage.setItem("onboarded_v1", "1");
+        setShowGuide(true);
+      }
     } finally {
       setLoading(false);
     }

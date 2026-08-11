@@ -105,8 +105,26 @@ export async function DELETE(req: NextRequest) {
   if (myPhotos.length) await sb.storage.from(PHOTO_BUCKET).remove(myPhotos).catch(() => {});
 
   // 나와 관련된 매칭/만남/피드백 정리(FK 안전 순서)
-  const { data: myMatches } = await sb.from("matches").select("id").or(`user_a.eq.${id},user_b.eq.${id}`);
+  const { data: myMatches } = await sb
+    .from("matches")
+    .select("id, user_a, user_b, state")
+    .or(`user_a.eq.${id},user_b.eq.${id}`);
   const matchIds = (myMatches ?? []).map((m) => m.id);
+
+  // ⚠ 매칭 행을 지우면 만료 배치가 상대를 찾지 못해, 상대가 match_pending/dating에
+  //   영구히 갇힌다(추천에서 조용히 사라짐). 삭제 전에 상대를 active로 돌려놓는다.
+  const counterparts = (myMatches ?? [])
+    .filter((m) => m.state === "pending" || m.state === "accepted")
+    .map((m) => (m.user_a === id ? m.user_b : m.user_a))
+    .filter((uid) => uid !== id);
+  if (counterparts.length) {
+    await sb
+      .from("users")
+      .update({ status: "active" })
+      .in("id", [...new Set(counterparts)])
+      .in("status", ["match_pending", "dating"]);
+  }
+
   if (matchIds.length) {
     const { data: mtgs } = await sb.from("meetings").select("id").in("match_id", matchIds);
     const meetingIds = (mtgs ?? []).map((x) => x.id);

@@ -33,7 +33,7 @@ interface Meeting {
   started_at: number;
   i_responded: boolean;
   partner_responded: boolean;
-  partner: { name: string; photos: string[] };
+  partner: { name: string; photos?: string[] }; // 사진은 양측 동의 시에만 포함
 }
 
 export function Matches() {
@@ -52,6 +52,7 @@ export function Matches() {
   const [fbNoShow, setFbNoShow] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [newIds, setNewIds] = useState<Set<string>>(new Set()); // 이번에 새로 등장한 매칭(순간 강조용)
+  const [acting, setActing] = useState(false); // 수락/거절·피드백 중복 클릭 방지
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
@@ -91,6 +92,8 @@ export function Matches() {
   }, [load]);
 
   const respond = async (id: string, action: "accept" | "reject") => {
+    if (acting) return;
+    setActing(true);
     try {
       const data = await api<{ state: string }>(`/matches/${id}/respond`, {
         method: "POST",
@@ -102,6 +105,8 @@ export function Matches() {
       window.dispatchEvent(new Event("notifs:refresh")); // 응답 반영해 헤더 배지 감소
     } catch (err) {
       toast((err as Error).message);
+    } finally {
+      setActing(false);
     }
   };
 
@@ -146,6 +151,8 @@ export function Matches() {
   };
 
   const submitFeedback = async (payload: Record<string, unknown>) => {
+    if (acting) return;
+    setActing(true);
     try {
       const data = await api<{ resolved: boolean; status: string }>("/me/meeting/feedback", {
         method: "POST",
@@ -159,6 +166,8 @@ export function Matches() {
       load();
     } catch (err) {
       toast((err as Error).message);
+    } finally {
+      setActing(false);
     }
   };
 
@@ -212,9 +221,10 @@ export function Matches() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => submitFeedback({ decision: "close", reason_category: fbReason, no_show: fbNoShow })}
-                      className="flex-1 rounded-xl bg-wine-600 py-2 text-sm font-semibold text-paper transition hover:bg-wine-700"
+                      disabled={acting}
+                      className="flex-1 rounded-xl bg-wine-600 py-2 text-sm font-semibold text-paper transition hover:bg-wine-700 disabled:opacity-40"
                     >
-                      종료 확정
+                      {acting ? "처리 중..." : "종료 확정"}
                     </button>
                     <button
                       onClick={() => setShowCloseForm(false)}
@@ -228,9 +238,10 @@ export function Matches() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => submitFeedback({ decision: "continue" })}
-                    className="flex-1 rounded-xl bg-wine-600 py-2 text-sm font-semibold text-paper transition hover:bg-wine-700"
+                    disabled={acting}
+                    className="flex-1 rounded-xl bg-wine-600 py-2 text-sm font-semibold text-paper transition hover:bg-wine-700 disabled:opacity-40"
                   >
-                    교제 시작
+                    {acting ? "처리 중..." : "교제 시작"}
                   </button>
                   <button
                     onClick={() => setShowCloseForm(true)}
@@ -324,13 +335,15 @@ export function Matches() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => respond(m.id, "accept")}
-                            className="flex-1 rounded-xl bg-wine-600 py-2 text-sm font-semibold text-paper transition hover:bg-wine-700"
+                            disabled={acting}
+                            className="flex-1 rounded-xl bg-wine-600 py-2 text-sm font-semibold text-paper transition hover:bg-wine-700 disabled:opacity-40"
                           >
-                            수락
+                            {acting ? "처리 중..." : "수락"}
                           </button>
                           <button
                             onClick={() => respond(m.id, "reject")}
-                            className="rounded-xl border border-line bg-white px-4 py-2 text-sm text-ink-soft transition hover:bg-cream"
+                            disabled={acting}
+                            className="rounded-xl border border-line bg-white px-4 py-2 text-sm text-ink-soft transition hover:bg-cream disabled:opacity-40"
                           >
                             거절
                           </button>

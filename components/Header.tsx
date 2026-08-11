@@ -34,7 +34,9 @@ export function Header() {
   }, [isMember]);
 
   useEffect(() => {
-    loadNotifs();
+    // 실제 setState는 await 이후에만 일어나지만(동기 갱신 아님), 린트 규칙이
+    // 이펙트 본문의 호출을 구분하지 못해 마이크로태스크로 넘긴다.
+    void Promise.resolve().then(loadNotifs);
   }, [loadNotifs, pathname]);
 
   useEffect(() => {

@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authFromToken, bearerToken, getUserById } from "@/lib/auth";
 import { ok, unauthorized, forbidden } from "@/lib/http";
 import { activeMeetingOf } from "@/lib/meeting";
-import { publicUserWithPhotos } from "@/lib/serialize";
+import { publicUser, publicUserWithPhotos } from "@/lib/serialize";
 import { CLOSE_REASONS } from "@/lib/constants";
 
 export const runtime = "nodejs";
@@ -24,17 +24,31 @@ export async function GET(req: NextRequest) {
   const hasFb = async (uid: string) =>
     !!(await sb.from("feedbacks").select("1").eq("meeting_id", mt.id).eq("from_user", uid).maybeSingle()).data;
 
-  const [partnerWithPhotos, iResponded, partnerResponded] = await Promise.all([
-    publicUserWithPhotos(partner),
+  // 사진은 매칭함과 동일하게 "양측 photo_consent"가 모두 있을 때만 공개한다.
+  // (여기서 무조건 공개하면 상대가 동의하지 않아도 사진이 노출된다 — 서비스 약속 위반)
+  const bothConsented = async () => {
+    const { data: ev } = await sb
+      .from("point_events")
+      .select("user_id")
+      .eq("type", "photo_consent")
+      .eq("related_match_id", mt.match_id);
+    const s = new Set((ev ?? []).map((e) => e.user_id));
+    return s.has(user.id) && s.has(partner.id);
+  };
+
+  const [exchanged, iResponded, partnerResponded] = await Promise.all([
+    bothConsented(),
     hasFb(user.id),
     hasFb(partner.id),
   ]);
+  const partnerPayload = exchanged ? await publicUserWithPhotos(partner) : publicUser(partner);
 
   return ok({
     meeting: {
       id: mt.id,
       started_at: mt.started_at,
-      partner: partnerWithPhotos,
+      partner: partnerPayload,
+      photos_exchanged: exchanged,
       i_responded: iResponded,
       partner_responded: partnerResponded, // 상대 선택 내용은 비공개
     },

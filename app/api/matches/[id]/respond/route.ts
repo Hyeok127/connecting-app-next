@@ -49,9 +49,27 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     await sb.from("users").update({ contact: myContact }).eq("id", user.id);
     await sb.from("matches").update({ [col]: "accept" }).eq("id", match.id);
 
-    if (match[otherCol as keyof MatchRow] === "accept") {
+    // ⚠ 동시성: 위 스냅샷(match)은 내 응답을 쓰기 "전" 값이라, 두 사람이 동시에 수락하면
+    //   양쪽 다 상대가 아직 pending인 것으로 보고 성사 처리를 건너뛴다. 반드시 다시 읽는다.
+    const { data: fresh } = await sb
+      .from("matches")
+      .select("a_response, b_response")
+      .eq("id", match.id)
+      .maybeSingle();
+    const otherAccepted = (fresh as MatchRow | null)?.[otherCol as "a_response" | "b_response"] === "accept";
+
+    if (otherAccepted) {
       // 쌍방 수락 → dating 락 + meeting 생성 + 포인트 + 다른 pending 정리
-      await sb.from("matches").update({ state: "accepted", closed_at: nowMs() }).eq("id", match.id);
+      // 연타/동시요청으로 두 번 성사되지 않도록, state 전이를 조건부 업데이트로 선점한다.
+      // pending인 행을 accepted로 바꾼 요청만 아래 후속 처리를 수행한다.
+      const { data: claimed } = await sb
+        .from("matches")
+        .update({ state: "accepted", closed_at: nowMs() })
+        .eq("id", match.id)
+        .eq("state", "pending")
+        .select("id");
+      if (!claimed || claimed.length === 0) return ok({ ok: true, state: "accepted" }); // 이미 다른 요청이 처리함
+
       await sb.from("users").update({ status: "dating" }).in("id", [match.user_a, match.user_b]);
       await sb.from("meetings").insert({
         id: genId(),

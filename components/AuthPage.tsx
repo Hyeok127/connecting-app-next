@@ -65,6 +65,7 @@ export function AuthPage() {
         role,
         name: f.get("name"),
         pin: f.get("pin"),
+        agree: f.get("agree") === "on", // 약관·개인정보처리방침 동의(서버에서 기록)
       };
       if (role === "member") {
         // 사진은 가입 시 받지 않는다 — 매칭 성사 후 상호 동의로 교환(004).
@@ -272,6 +273,20 @@ export function AuthPage() {
             </div>
           </div>
 
+          <label className="mt-5 flex items-start gap-2 rounded-xl border border-line bg-cream/50 p-3 text-sm text-ink-soft">
+            <input type="checkbox" name="agree" required className="mt-0.5" />
+            <span>
+              <a href="/terms" target="_blank" className="text-wine-700 underline underline-offset-2">
+                이용약관
+              </a>
+              과{" "}
+              <a href="/privacy" target="_blank" className="text-wine-700 underline underline-offset-2">
+                개인정보처리방침
+              </a>
+              에 동의합니다. <span className="text-ink-faint">(필수)</span>
+            </span>
+          </label>
+
           {error && <p className="mt-3 text-sm text-wine-600">{error}</p>}
           <button disabled={busy} className={btnCls}>
             {busy ? "가입 중..." : "가입하기"}
@@ -280,6 +295,15 @@ export function AuthPage() {
       )}
 
       <GuideModal />
+
+      <div className="mt-6 flex justify-center gap-4 text-xs text-ink-faint">
+        <a href="/terms" className="underline-offset-4 hover:underline">
+          이용약관
+        </a>
+        <a href="/privacy" className="underline-offset-4 hover:underline">
+          개인정보처리방침
+        </a>
+      </div>
     </div>
   );
 }

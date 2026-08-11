@@ -9,6 +9,7 @@ import { genId, nowMs, parseArr, PHOTO_PATH_RE, genInviteCode } from "@/lib/util
 import { publicUserWithPhotos } from "@/lib/serialize";
 import { cleanKeywords } from "@/lib/keywords";
 import { cleanValues, cleanValuePrefs } from "@/lib/values";
+import { LEGAL_VERSION } from "@/lib/legal";
 import type { UserRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest) {
     return fail("PIN은 숫자 6자리여야 합니다.", 400);
   if (!["member", "bridge"].includes(String(role)))
     return fail("계정 유형이 올바르지 않습니다.", 400);
+  if (body.agree !== true)
+    return fail("이용약관과 개인정보처리방침에 동의해주세요.", 400);
 
   const sb = getSupabase();
 
@@ -109,6 +112,16 @@ export async function POST(req: NextRequest) {
       return fail("이미 사용 중인 이름입니다.", 409);
     return fail(error.message, 400);
   }
+
+  // 약관·개인정보처리방침 동의 기록(개정 시 LEGAL_VERSION을 올려 재동의 판별).
+  // 스키마 변경 없이 point_events에 이벤트로 남긴다.
+  await sb.from("point_events").insert({
+    id: genId(),
+    user_id: id,
+    type: `consent|${LEGAL_VERSION}`,
+    points: 0,
+    created_at: nowMs(),
+  });
 
   // 가입 시 선호 조건 (선택, R24) — 성별/나이/직업/지역 하드 필터 + 바라는 가치관.
   if (role === "member") {

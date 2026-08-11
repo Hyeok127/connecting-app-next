@@ -40,7 +40,11 @@ export async function resolveMeeting(meetingId: string): Promise<boolean> {
     .from("feedbacks")
     .select("*")
     .eq("meeting_id", meetingId);
-  const list = (fbs as FeedbackRow[]) ?? [];
+  // ⚠ 같은 사람이 연타로 두 번 제출하면 행이 2개가 된다. 작성자별로 1건만 남겨야
+  //   한 사람의 중복 제출이 "양쪽 응답"으로 오인되지 않는다(노쇼 감점 중복도 방지).
+  const byUser = new Map<string, FeedbackRow>();
+  for (const f of (fbs as FeedbackRow[]) ?? []) if (!byUser.has(f.from_user)) byUser.set(f.from_user, f);
+  const list = [...byUser.values()];
   if (list.length < 2) return false; // R19: 양쪽 선택 필요
 
   const { data: mt } = await sb

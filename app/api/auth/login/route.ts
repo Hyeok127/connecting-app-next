@@ -1,7 +1,13 @@
 import type { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSupabase } from "@/lib/supabase";
-import { createSession, lockedUntil, registerLoginFail, registerLoginSuccess } from "@/lib/auth";
+import {
+  createSession,
+  lockedUntil,
+  registerLoginFail,
+  registerLoginSuccess,
+  escapeLikePattern,
+} from "@/lib/auth";
 import { ok, fail } from "@/lib/http";
 import { clientIp, ipAllowed } from "@/lib/ratelimit";
 import { LOGIN_IP_MAX } from "@/lib/constants";
@@ -32,11 +38,19 @@ export async function POST(req: NextRequest) {
   }
 
   const sb = getSupabase();
-  const { data: u } = await sb.from("users").select("*").ilike("name", uname).maybeSingle();
+  // 대소문자 무시 매칭은 유지하되, `%`/`_`는 리터럴로 이스케이프한다(와일드카드 우회 차단).
+  const { data: u } = await sb
+    .from("users")
+    .select("*")
+    .ilike("name", escapeLikePattern(uname))
+    .maybeSingle();
   if (!u || !bcrypt.compareSync(String(pin ?? ""), (u as UserRow).pin_hash)) {
     await registerLoginFail(uname);
     return fail("이름 또는 PIN이 올바르지 않습니다.", 401);
   }
+  // 정지 계정은 로그인 단계에서 분명한 사유를 안내한다(세션은 발급하지 않음).
+  if ((u as UserRow).status === "suspended")
+    return fail("정지된 계정입니다. 운영자에게 문의해주세요.", 403);
   await registerLoginSuccess(uname);
   const token = await createSession((u as UserRow).id);
   const me = await publicUserWithPhotos(u as UserRow);

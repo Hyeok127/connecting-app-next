@@ -30,20 +30,31 @@ interface AdminReport {
   target_report_count: number;
 }
 
+interface Health {
+  cycle: string;
+  active_users: number;
+  matches_today: number;
+  last_match_cycle: string | null;
+  batch_stale: boolean;
+}
+
 export function Admin() {
   const toast = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
+  const [health, setHealth] = useState<Health | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [u, r] = await Promise.all([
+      const [u, r, h] = await Promise.all([
         api<{ users: AdminUser[] }>("/admin/users"),
         api<{ reports: AdminReport[] }>("/admin/reports"),
+        api<Health>("/health").catch(() => null),
       ]);
       setUsers(u.users);
       setReports(r.reports);
+      setHealth(h);
     } finally {
       setLoading(false);
     }
@@ -89,6 +100,24 @@ export function Admin() {
           수동 배치 실행
         </button>
       </div>
+
+      {health && (
+        <div className={`mb-6 rounded-2xl border p-4 ${health.batch_stale ? "border-gold-200 bg-gold-100/40" : "border-line bg-white"}`}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <span className="font-display font-semibold text-ink">배치 상태</span>
+            <span className="text-ink-soft">
+              오늘({health.cycle}) 매칭 <strong className="text-ink">{health.matches_today}</strong>건
+            </span>
+            <span className="text-ink-faint">활동 회원 {health.active_users}명</span>
+            <span className="text-ink-faint">마지막 매칭 사이클 {health.last_match_cycle ?? "없음"}</span>
+          </div>
+          {health.batch_stale && (
+            <p className="mt-1.5 text-xs text-gold-700">
+              오늘 생성된 매칭이 없습니다. 밤 8시 이전이면 정상이고, 이후에도 0이면 배치를 확인하세요.
+            </p>
+          )}
+        </div>
+      )}
 
       {reports.length > 0 && (
         <div className="mb-6 rounded-2xl border border-red-100 bg-red-50/50 p-4">

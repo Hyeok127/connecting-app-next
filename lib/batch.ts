@@ -1,8 +1,13 @@
 // lib/batch.ts — 배치 매칭 실행 (Supabase RPC로 원자 실행)
 import { getSupabase } from "@/lib/supabase";
 
+// 004_hardening.sql의 잠금 버전을 우선 사용(크론과 수동 배치 동시 실행 방지).
+// 아직 SQL 미적용이면 기존 함수로 폴백한다.
 export async function runBatch(): Promise<string> {
-  const { data, error } = await getSupabase().rpc("run_batch_matching");
+  const sb = getSupabase();
+  const locked = await sb.rpc("run_batch_matching_locked");
+  if (!locked.error) return String(locked.data);
+  const { data, error } = await sb.rpc("run_batch_matching");
   if (error) throw new Error(error.message);
   return String(data);
 }

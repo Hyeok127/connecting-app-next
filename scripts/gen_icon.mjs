@@ -1,9 +1,13 @@
 // 앱 아이콘 생성기 — '교집합' 컨셉(겹친 두 원 = 상호 3순위 교집합 매칭).
 // 4배 슈퍼샘플링으로 다운샘플해 곡선을 부드럽게(안티에일리어싱) 만든다.
-// 실행: node scripts/gen_icon.js  → public/icon-192.png, icon-512.png
-const fs = require("fs");
-const path = require("path");
-const { PNG } = require("pngjs");
+// 실행: node scripts/gen_icon.mjs  → public/icon-192.png, icon-512.png
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import pkg from "pngjs";
+
+const { PNG } = pkg;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PALETTE = {
   0: [0, 0, 0, 0], // 투명(라운드 사각 밖)
@@ -23,10 +27,10 @@ function set(buf, S, x, y, id) {
 
 // 겹친 두 원. 교집합은 blend 색으로 채운다.
 function draw(buf, S) {
-  const R = S * 0.2,
-    lx = S * 0.41,
-    rx = S * 0.59,
-    cy = S / 2;
+  const R = S * 0.2;
+  const lx = S * 0.41;
+  const rx = S * 0.59;
+  const cy = S / 2;
   for (let y = Math.floor(cy - R); y <= Math.ceil(cy + R); y++)
     for (let x = Math.floor(lx - R); x <= Math.ceil(rx + R); x++) {
       const inL = Math.hypot(x - lx, y - cy) <= R;
@@ -52,7 +56,10 @@ function render(size) {
   const png = new PNG({ width: size, height: size });
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
-      let R = 0, G = 0, B = 0, A = 0;
+      let R = 0;
+      let G = 0;
+      let B = 0;
+      let A = 0;
       for (let sy = 0; sy < F; sy++)
         for (let sx = 0; sx < F; sx++) {
           const c = PALETTE[buf[S * (y * F + sy) + (x * F + sx)]];

@@ -40,7 +40,8 @@ export function PushToggle() {
   }, [supported]);
 
   useEffect(() => {
-    sync();
+    // sync 내부의 setState는 비동기 조회 이후에 일어난다(위 Header와 같은 이유).
+    void Promise.resolve().then(sync);
   }, [sync]);
 
   const enable = async () => {
