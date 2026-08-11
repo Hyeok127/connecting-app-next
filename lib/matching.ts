@@ -43,14 +43,7 @@ export interface Prefs {
   mbtis: string[];
 }
 
-export async function getPrefs(userId: string): Promise<Prefs | null> {
-  const { data } = await getSupabase()
-    .from("preferences")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!data) return null;
-  const r = data as PreferencesRow;
+function rowToPrefs(r: PreferencesRow): Prefs {
   return {
     genders: parseJsonArray(r.genders),
     age_min: r.age_min,
@@ -59,6 +52,15 @@ export async function getPrefs(userId: string): Promise<Prefs | null> {
     regions: parseJsonArray(r.regions),
     mbtis: parseJsonArray(r.mbtis),
   };
+}
+
+export async function getPrefs(userId: string): Promise<Prefs | null> {
+  const { data } = await getSupabase()
+    .from("preferences")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data ? rowToPrefs(data as PreferencesRow) : null;
 }
 
 // 하드 필터(성별/나이/직업/지역/MBTI). 키워드는 필터가 아니라 유사도 점수로만 반영한다.
@@ -103,22 +105,43 @@ const VALUE_WEIGHT = 1.0; // 가치관 한 항목 일치당 가산점 (키워드
 
 export async function recommendationsFor(meId: string, me: UserRow): Promise<UserRow[]> {
   const sb = getSupabase();
+  // 후보 전체 + 필요한 부가정보를 "일괄 조회"한다(후보마다 개별 쿼리 X — N+1 제거).
   const { data: rows } = await sb
     .from("users")
     .select("*")
     .eq("role", "member")
     .eq("status", "active")
     .neq("id", meId);
-  const myPrefs = await getPrefs(meId);
+  const candidates = (rows as UserRow[]) ?? [];
+  const candIds = candidates.map((c) => c.id);
+
+  const [myPrefs, myMatches, myRanks, allPrefs] = await Promise.all([
+    getPrefs(meId),
+    sb.from("matches").select("user_a,user_b").or(`user_a.eq.${meId},user_b.eq.${meId}`), // R7: 매칭 이력
+    sb.from("rankings").select("target_id").eq("user_id", meId), // R16: 3회 이상 등재
+    candIds.length
+      ? sb.from("preferences").select("*").in("user_id", candIds) // 상대 선호(상호 필터용)
+      : Promise.resolve({ data: [] as PreferencesRow[] }),
+  ]);
+
+  const historySet = new Set<string>();
+  for (const m of (myMatches.data as { user_a: string; user_b: string }[]) ?? [])
+    historySet.add(m.user_a === meId ? m.user_b : m.user_a);
+  const rankCount = new Map<string, number>();
+  for (const r of (myRanks.data as { target_id: string }[]) ?? [])
+    rankCount.set(r.target_id, (rankCount.get(r.target_id) ?? 0) + 1);
+  const prefsMap = new Map<string, Prefs>();
+  for (const p of (allPrefs.data as PreferencesRow[]) ?? []) prefsMap.set(p.user_id, rowToPrefs(p));
+
   const myKw = parseJsonArray(me.keywords);
   const myVals = parseValues(me.workplace); // 가치관은 users.workplace(JSON)에 저장
 
   const scored: { u: UserRow; sim: number }[] = [];
-  for (const u of (rows as UserRow[]) ?? []) {
-    if (await hasMatchHistory(meId, u.id)) continue; // R7
-    if (await isAutoExcluded(meId, u.id)) continue; // R16
+  for (const u of candidates) {
+    if (historySet.has(u.id)) continue; // R7
+    if ((rankCount.get(u.id) ?? 0) >= 3) continue; // R16
     if (!fits(myPrefs, u)) continue; // R6
-    if (!fits(await getPrefs(u.id), me)) continue; // R6 (상호)
+    if (!fits(prefsMap.get(u.id) ?? null, me)) continue; // R6 (상호)
     // 취미 키워드는 유사할수록, 가치관(술/담배/문신/종교)은 같을수록 가산.
     const sim =
       keywordSimilarity(myKw, parseJsonArray(u.keywords)) +
