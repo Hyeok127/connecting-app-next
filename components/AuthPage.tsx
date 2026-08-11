@@ -6,6 +6,7 @@ import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
+import { GuideModal } from "@/components/GuideModal";
 import type { User } from "@/lib/types";
 
 type Tab = "login" | "signup";
@@ -268,6 +269,8 @@ export function AuthPage() {
           </button>
         </form>
       )}
+
+      <GuideModal />
     </div>
   );
 }
