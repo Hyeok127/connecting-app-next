@@ -7,6 +7,7 @@ import { clientIp, ipAllowed } from "@/lib/ratelimit";
 import { SIGNUP_IP_MAX } from "@/lib/constants";
 import { genId, nowMs, parseArr, PHOTO_PATH_RE, genInviteCode } from "@/lib/utils";
 import { publicUserWithPhotos } from "@/lib/serialize";
+import { cleanKeywords } from "@/lib/keywords";
 import type { UserRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -50,8 +51,9 @@ export async function POST(req: NextRequest) {
       return fail("성별을 선택해주세요.", 400);
     if (!age || age < 19 || age > 99)
       return fail("나이를 확인해주세요.", 400);
-    if (keywords.length !== 3)
-      return fail("키워드는 정확히 3개 입력해주세요.", 400); // R2
+    const cleanKw = cleanKeywords(keywords);
+    if (cleanKw.length < 1)
+      return fail("나를 나타내는 키워드를 1개 이상 골라주세요.", 400);
     // 사진은 가입 시 받지 않는다 — 매칭 성사 후 상호 동의 교환으로 이동.
     // 값이 넘어오는 경우(프로필에서 미리 등록 등)만 형식 검증한다.
     if (photos.length > 3) return fail("사진은 최대 3장까지 가능합니다.", 400);
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
       workplace: String(body.workplace ?? "").trim() || null,
       region: String(body.region ?? "").trim() || null,
       mbti: String(body.mbti ?? "").trim().toUpperCase() || null,
-      keywords: JSON.stringify(keywords),
+      keywords: JSON.stringify(cleanKw),
       photos: JSON.stringify(photos),
       contact: String(body.contact ?? "").trim() || null,
     };
@@ -109,8 +111,8 @@ export async function POST(req: NextRequest) {
   if (role === "member") {
     const genders = parseArr(body.pref_genders).filter((g) => ["남성", "여성"].includes(g));
     const jobs = parseArr(body.pref_jobs);
-    // 선호 키워드(1~3)는 workplaces 컬럼을 재사용해 저장(DDL 회피).
-    const prefKeywords = parseArr(body.pref_keywords).slice(0, 3);
+    // 선호 키워드(최대 5)는 workplaces 컬럼을 재사용해 저장(DDL 회피). 고정 세트로만.
+    const prefKeywords = cleanKeywords(parseArr(body.pref_keywords));
     const regions = parseArr(body.pref_regions);
     const ageMin = body.pref_age_min ? Number(body.pref_age_min) : null;
     const ageMax = body.pref_age_max ? Number(body.pref_age_max) : null;

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
+import { KeywordPicker } from "@/components/KeywordPicker";
 import type { User } from "@/lib/types";
 
 type Tab = "login" | "signup";
@@ -71,7 +72,7 @@ export function AuthPage() {
           job: f.get("job"),
           region: f.get("region"),
           mbti: f.get("mbti"),
-          keywords: [f.get("kw1"), f.get("kw2"), f.get("kw3")],
+          keywords: f.getAll("kw"),
           pref_genders: f.getAll("pref_genders"),
           pref_age_min: f.get("pref_age_min"),
           pref_age_max: f.get("pref_age_max"),
@@ -220,14 +221,11 @@ export function AuthPage() {
               MBTI (선택)
               <input name="mbti" maxLength={4} placeholder="예: ENFP" className={inputCls} />
             </label>
-            <div>
-              <span className="text-sm font-medium text-ink-soft">키워드 3개</span>
-              <div className="mt-1 grid grid-cols-3 gap-2">
-                <input name="kw1" placeholder="키워드1" className={inputCls} />
-                <input name="kw2" placeholder="키워드2" className={inputCls} />
-                <input name="kw3" placeholder="키워드3" className={inputCls} />
-              </div>
-            </div>
+            <KeywordPicker
+              name="kw"
+              label="나를 나타내는 키워드 (1~5개)"
+              hint="관심사·성향을 골라주세요. 추천에 활용돼요."
+            />
             <div className="rounded-xl border border-line bg-cream/50 p-4">
               <p className="text-sm font-medium text-ink-soft">상대방 선호 조건 (선택)</p>
               <div className="mt-2 flex gap-4 text-sm text-ink-soft">
@@ -242,16 +240,12 @@ export function AuthPage() {
                 <input name="pref_age_min" type="number" placeholder="최소 나이" className={inputCls} />
                 <input name="pref_age_max" type="number" placeholder="최대 나이" className={inputCls} />
               </div>
-              <div className="mt-2">
-                <span className="text-sm font-medium text-ink-soft">선호 키워드 (1~3개)</span>
-                <div className="mt-1 grid grid-cols-3 gap-2">
-                  <input name="pref_kw" placeholder="예: 여행" className={inputCls} />
-                  <input name="pref_kw" placeholder="예: 독서" className={inputCls} />
-                  <input name="pref_kw" placeholder="예: 운동" className={inputCls} />
-                </div>
-                <p className="mt-1 text-xs text-ink-faint">
-                  ※ 상대에게 바라는 키워드예요. 추천 순위에 키워드 유사도로 반영돼요.
-                </p>
+              <div className="mt-3">
+                <KeywordPicker
+                  name="pref_kw"
+                  label="선호 키워드 (최대 5개)"
+                  hint="상대에게 바라는 키워드. 추천 순위에 유사도로 반영돼요(유의어도 연결)."
+                />
               </div>
               <p className="mt-2 text-xs text-ink-faint">※ 비워두면 조건 제한 없이 추천돼요.</p>
             </div>

@@ -5,6 +5,7 @@ import { ok, fail, unauthorized } from "@/lib/http";
 import { parseArr, PHOTO_PATH_RE } from "@/lib/utils";
 import { PHOTO_BUCKET } from "@/lib/constants";
 import { parseJsonArray, publicUserWithPhotos } from "@/lib/serialize";
+import { cleanKeywords } from "@/lib/keywords";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -51,8 +52,8 @@ export async function PUT(req: NextRequest) {
       if (body[f] !== undefined) sets[f] = String(body[f]).trim() || null;
     }
     if (body.keywords !== undefined) {
-      const kw = parseArr(body.keywords);
-      if (kw.length !== 3) return fail("키워드는 정확히 3개 입력해주세요.", 400);
+      const kw = cleanKeywords(parseArr(body.keywords));
+      if (kw.length < 1) return fail("나를 나타내는 키워드를 1개 이상 골라주세요.", 400);
       sets.keywords = JSON.stringify(kw);
     }
     if (body.photos !== undefined) {

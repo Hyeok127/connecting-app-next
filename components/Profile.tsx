@@ -5,6 +5,7 @@ import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { uploadPhotos } from "@/lib/upload";
 import { Avatar, Badge, KeywordChips, Spinner, Empty } from "@/components/ui";
+import { KeywordPicker } from "@/components/KeywordPicker";
 
 const inputCls =
   "mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-wine-500 focus:ring-2 focus:ring-wine-100";
@@ -58,7 +59,7 @@ export function Profile() {
         job: f.get("job"),
         region: f.get("region"),
         mbti: f.get("mbti"),
-        keywords: [f.get("kw1"), f.get("kw2"), f.get("kw3")],
+        keywords: f.getAll("kw"),
         contact: f.get("contact"),
       };
       if (photos) body.photos = photos;
@@ -158,14 +159,13 @@ export function Profile() {
               MBTI (선택) <input name="mbti" maxLength={4} defaultValue={user.mbti ?? ""} className={inputCls} />
             </label>
           </div>
-          <label className={`${labelCls} mt-3`}>
-            키워드 3개
-            <div className="mt-1 grid grid-cols-3 gap-2">
-              <input name="kw1" defaultValue={(user.keywords || [])[0]} className={inputCls} />
-              <input name="kw2" defaultValue={(user.keywords || [])[1]} className={inputCls} />
-              <input name="kw3" defaultValue={(user.keywords || [])[2]} className={inputCls} />
-            </div>
-          </label>
+          <div className="mt-3">
+            <KeywordPicker
+              name="kw"
+              label="나를 나타내는 키워드 (1~5개)"
+              defaultSelected={user.keywords || []}
+            />
+          </div>
           <label className={`${labelCls} mt-3`}>
             연락처 <input name="contact" defaultValue={user.contact ?? ""} placeholder="카톡ID 또는 전화번호" className={inputCls} />
           </label>
@@ -197,15 +197,12 @@ export function Profile() {
           <input name="jobs" placeholder="직업 (콤마 구분)" className={`mt-2 ${inputCls}`} />
           <input name="regions" placeholder="사는 곳 (콤마 구분)" className={`mt-2 ${inputCls}`} />
           <div className="mt-3">
-            <span className="text-sm font-medium text-ink-soft">선호 키워드 (1~3개)</span>
-            <div className="mt-1 grid grid-cols-3 gap-2">
-              <input name="pref_kw" defaultValue={prefKeywords[0] ?? ""} placeholder="키워드1" className={inputCls} />
-              <input name="pref_kw" defaultValue={prefKeywords[1] ?? ""} placeholder="키워드2" className={inputCls} />
-              <input name="pref_kw" defaultValue={prefKeywords[2] ?? ""} placeholder="키워드3" className={inputCls} />
-            </div>
-            <p className="mt-1 text-xs text-ink-faint">
-              ※ 상대에게 바라는 키워드. 추천 순위에 키워드 유사도로 반영돼요.
-            </p>
+            <KeywordPicker
+              name="pref_kw"
+              label="선호 키워드 (최대 5개)"
+              hint="상대에게 바라는 키워드. 추천 순위에 유사도로 반영돼요(유의어도 연결)."
+              defaultSelected={prefKeywords}
+            />
           </div>
           <button className="mt-5 w-full rounded-xl bg-ink py-2.5 text-sm font-semibold text-paper transition hover:bg-ink/85">
             선호 조건 저장

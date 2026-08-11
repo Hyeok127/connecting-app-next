@@ -136,13 +136,25 @@ Supabase 프로젝트가 두 개다. **둘 다 같은 조직(Hyeok127's Org) 안
   저장에 재사용한다(도메인상 `Prefs.keywords`, 물리 컬럼은 `workplaces`). 새 컬럼 추가는
   클라우드 DDL이 필요해 회피. `lib/matching.ts`/`api/me/preferences`/`api/auth/signup`에
   해당 매핑 주석 있음.
-- **추천 알고리즘(`lib/matching.recommendationsFor`)**: 하드 필터(성별/나이/직업/지역/MBTI)를
-  통과한 후보를 **키워드 유사도**로 정렬한다 — `keywordSimilarity()` =
-  `3×(내 선호 ∩ 상대 프로필) + 3×(상대 선호 ∩ 내 프로필) + 2×(프로필 공유)`. 동점이면
-  신뢰점수·가입순. 키워드는 하드 필터가 아니라 점수 요소다(선호 키워드가 없어도 후보에서
-  빠지지 않음).
-- **검증(2026-08-11, 라이브 클라우드)**: 선호 키워드 '등산'인 뷰어에게, 프로필에 '등산'을
-  가진 후보가 무관 후보보다 추천 상위로 정렬됨(scratchpad/kw_reco.mjs).
+- **고정 키워드 세트 + 칩 선택(2026-08-11 확장)**: 자유 입력 대신 `lib/keywords.ts`의 고정
+  세트(14개 카테고리, ~148개)에서 칩으로 고른다(`components/KeywordPicker.tsx`). 프로필
+  키워드·선호 키워드 **각각 최대 5개**(`MAX_KEYWORDS`). 입력은 `cleanKeywords()`로 세트
+  안의 값만 통과. 세트를 바꾸면 아래 임베딩을 재생성해야 한다.
+- **임베딩 기반 유사도(유의어 연결)**: 각 키워드의 임베딩을 **사전 계산**해
+  `lib/keyword_vectors.json`(384차원, 정규화+평균centering된 단위벡터)으로 배포한다.
+  생성: `scripts/embed_keywords.mjs`(`@xenova/transformers`, 모델
+  `Xenova/paraphrase-multilingual-MiniLM-L12-v2`) — **개발 시 1회 실행, 런타임/배포엔
+  모델·API 없음**(정적 JSON만 읽어 코사인 계산). centering은 anisotropy(모든 쌍이 높게
+  나오는 현상) 교정용. 코사인 `< 0.4`(SIM_THRESHOLD)는 무관/반대말로 보고 무시.
+- **추천 알고리즘(`lib/matching.recommendationsFor`)**: 하드 필터(성별/나이/직업/지역/MBTI)
+  통과 후보를 **키워드 유사도**로 정렬 — `keywordSimilarity()` =
+  `3×softCover(내 선호→상대 프로필) + 3×softCover(상대 선호→내 프로필) + 2×softCover(프로필 공유)`.
+  `softCover(A,B)`=A의 각 키워드가 B에서 갖는 최대 코사인(임계값 이상)의 합. 동점이면
+  신뢰점수·가입순. 키워드는 하드 필터가 아니라 점수 요소(선호 없어도 후보에서 안 빠짐).
+  세트 밖(레거시 자유입력)은 정확일치만 인정.
+- **검증(2026-08-11, 라이브 클라우드)**: ① 선호 '등산' 뷰어에게 '등산' 후보가 무관 후보보다
+  상위(kw_reco.mjs). ② 선호 '등산' 뷰어에게 **정확히 같지 않은 유의어 '캠핑' 후보가 무관
+  '재테크' 후보보다 상위**로 정렬 — 임베딩 유의어 연결 확인(kw_embed_reco.mjs).
 
 ## 릴리스 체크리스트 — 개인정보 최소화판 (2026-08-11)
 
