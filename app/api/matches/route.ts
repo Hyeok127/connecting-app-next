@@ -24,14 +24,36 @@ export async function GET(req: NextRequest) {
     .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
     .order("created_at", { ascending: false });
 
+  const matchRows = (rows as MatchRow[]) ?? [];
+
+  // 사진 교환 동의는 스키마 변경(DDL) 없이 point_events에 이벤트로 기록한다.
+  // type='photo_consent', related_match_id=매칭, user_id=동의자. 매칭당 양측 이벤트가
+  // 모두 있으면 교환 성립. (기존 포인트 합산엔 points=0이라 영향 없음)
+  const consentByMatch = new Map<string, Set<string>>();
+  const ids = matchRows.map((m) => m.id);
+  if (ids.length) {
+    const { data: ev } = await sb
+      .from("point_events")
+      .select("user_id, related_match_id")
+      .eq("type", "photo_consent")
+      .in("related_match_id", ids);
+    for (const e of ev ?? []) {
+      if (!e.related_match_id) continue;
+      const s = consentByMatch.get(e.related_match_id) ?? new Set<string>();
+      s.add(e.user_id);
+      consentByMatch.set(e.related_match_id, s);
+    }
+  }
+
   const list: unknown[] = [];
-  for (const m of (rows as MatchRow[]) ?? []) {
+  for (const m of matchRows) {
     const isA = m.user_a === user.id;
     const other = await getUserById(isA ? m.user_b : m.user_a);
     if (!other) continue;
-    // 사진은 매칭 성사 후 양측이 모두 교환에 동의했을 때만 공개한다(004).
-    const myConsent = (isA ? m.a_photo_consent : m.b_photo_consent) === 1;
-    const partnerConsent = (isA ? m.b_photo_consent : m.a_photo_consent) === 1;
+    // 사진은 매칭 성사 후 양측이 모두 교환에 동의했을 때만 공개한다.
+    const consented = consentByMatch.get(m.id) ?? new Set<string>();
+    const myConsent = consented.has(user.id);
+    const partnerConsent = consented.has(other.id);
     const exchanged = m.state === "accepted" && myConsent && partnerConsent;
     const counterpart = exchanged
       ? await publicUserWithPhotos(other)
