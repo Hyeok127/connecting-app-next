@@ -1,45 +1,81 @@
-// 앱 아이콘 생성기(1회용). 와인색 라운드 사각 배경 + 크림색 하트.
+// 앱 아이콘 생성기 — '교집합' 컨셉(겹친 두 원 = 상호 3순위 교집합 매칭).
+// 4배 슈퍼샘플링으로 다운샘플해 곡선을 부드럽게(안티에일리어싱) 만든다.
+// 실행: node scripts/gen_icon.js  → public/icon-192.png, icon-512.png
 const fs = require("fs");
 const path = require("path");
 const { PNG } = require("pngjs");
 
-const WINE = [124, 45, 62]; // #7c2d3e
-const CREAM = [245, 235, 224]; // 살짝 크림
-const BG = WINE;
+const PALETTE = {
+  0: [0, 0, 0, 0], // 투명(라운드 사각 밖)
+  1: [124, 45, 62, 255], // wine  배경
+  2: [245, 235, 224, 255], // cream 왼쪽 원
+  3: [201, 162, 63, 255], // gold  오른쪽 원
+  4: [226, 205, 150, 255], // blend 교집합
+};
+const F = 4; // 슈퍼샘플 배율
 
-function heartInside(cx, cy, x, y, s) {
-  // 정규화 좌표계에서의 하트 부등식 (범위 대략 [-1.3,1.3])
-  const nx = (x - cx) / s;
-  const ny = -(y - cy) / s;
-  const a = nx * nx + ny * ny - 1;
-  return a * a * a - nx * nx * ny * ny * ny <= 0;
+function set(buf, S, x, y, id) {
+  if (x < 0 || y < 0 || x >= S || y >= S) return;
+  const i = S * y + x;
+  if (buf[i] === 0) return; // 라운드 사각 밖은 유지
+  buf[i] = id;
 }
 
-function gen(size, file) {
-  const png = new PNG({ width: size, height: size });
-  const r = size * 0.22; // 라운드 반경
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = (size * y + x) << 2;
-      // 라운드 사각 마스크
-      let inside = true;
-      const cornerX = x < r ? r - x : x > size - r ? x - (size - r) : 0;
-      const cornerY = y < r ? r - y : y > size - r ? y - (size - r) : 0;
-      if (cornerX > 0 && cornerY > 0 && cornerX * cornerX + cornerY * cornerY > r * r) inside = false;
-      let col = inside ? BG : [0, 0, 0];
-      const alpha = inside ? 255 : 0;
-      // 하트
-      if (inside && heartInside(size / 2, size * 0.47, x, y, size * 0.27)) col = CREAM;
-      png.data[idx] = col[0];
-      png.data[idx + 1] = col[1];
-      png.data[idx + 2] = col[2];
-      png.data[idx + 3] = alpha;
+// 겹친 두 원. 교집합은 blend 색으로 채운다.
+function draw(buf, S) {
+  const R = S * 0.2,
+    lx = S * 0.41,
+    rx = S * 0.59,
+    cy = S / 2;
+  for (let y = Math.floor(cy - R); y <= Math.ceil(cy + R); y++)
+    for (let x = Math.floor(lx - R); x <= Math.ceil(rx + R); x++) {
+      const inL = Math.hypot(x - lx, y - cy) <= R;
+      const inR = Math.hypot(x - rx, y - cy) <= R;
+      if (inL && inR) set(buf, S, x, y, 4);
+      else if (inL) set(buf, S, x, y, 2);
+      else if (inR) set(buf, S, x, y, 3);
     }
-  }
-  const out = path.join(__dirname, "..", "public", file);
-  fs.writeFileSync(out, PNG.sync.write(png));
+}
+
+function render(size) {
+  const S = size * F;
+  const buf = new Uint8Array(S * S);
+  const r = S * 0.22; // 라운드 반경
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const cx = x < r ? r - x : x > S - r ? x - (S - r) : 0;
+      const cy = y < r ? r - y : y > S - r ? y - (S - r) : 0;
+      buf[S * y + x] = cx > 0 && cy > 0 && cx * cx + cy * cy > r * r ? 0 : 1;
+    }
+  draw(buf, S);
+
+  const png = new PNG({ width: size, height: size });
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      let R = 0, G = 0, B = 0, A = 0;
+      for (let sy = 0; sy < F; sy++)
+        for (let sx = 0; sx < F; sx++) {
+          const c = PALETTE[buf[S * (y * F + sy) + (x * F + sx)]];
+          const a = c[3] / 255;
+          R += c[0] * a;
+          G += c[1] * a;
+          B += c[2] * a;
+          A += c[3];
+        }
+      const n = F * F;
+      const aAvg = A / n;
+      const norm = aAvg > 0 ? 255 / aAvg : 0; // 알파 프리멀티플라이 해제
+      const idx = (size * y + x) << 2;
+      png.data[idx] = Math.round((R / n) * norm);
+      png.data[idx + 1] = Math.round((G / n) * norm);
+      png.data[idx + 2] = Math.round((B / n) * norm);
+      png.data[idx + 3] = Math.round(aAvg);
+    }
+  return png;
+}
+
+for (const size of [192, 512]) {
+  const out = path.join(__dirname, "..", "public", `icon-${size}.png`);
+  fs.writeFileSync(out, PNG.sync.write(render(size)));
   console.log("wrote", out);
 }
-
-gen(192, "icon-192.png");
-gen(512, "icon-512.png");
