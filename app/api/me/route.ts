@@ -6,6 +6,7 @@ import { parseArr, PHOTO_PATH_RE } from "@/lib/utils";
 import { PHOTO_BUCKET } from "@/lib/constants";
 import { parseJsonArray, publicUserWithPhotos } from "@/lib/serialize";
 import { cleanKeywords } from "@/lib/keywords";
+import { cleanValues } from "@/lib/values";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -48,8 +49,13 @@ export async function PUT(req: NextRequest) {
     if (body.age !== undefined) sets.age = body.age ? Number(body.age) : null;
     if (body.gender && ["남성", "여성"].includes(String(body.gender))) sets.gender = String(body.gender);
     if (body.mbti !== undefined) sets.mbti = String(body.mbti).trim().toUpperCase() || null;
-    for (const f of ["job", "workplace", "region", "contact"] as const) {
+    for (const f of ["job", "region", "contact"] as const) {
       if (body[f] !== undefined) sets[f] = String(body[f]).trim() || null;
+    }
+    // 가치관 설문은 workplace 컬럼에 JSON으로 저장(근무지 자유입력 폐지).
+    if (body.values !== undefined) {
+      const vals = cleanValues(body.values);
+      sets.workplace = Object.keys(vals).length ? JSON.stringify(vals) : null;
     }
     if (body.keywords !== undefined) {
       const kw = cleanKeywords(parseArr(body.keywords));

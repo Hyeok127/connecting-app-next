@@ -5,6 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { KeywordPicker } from "@/components/KeywordPicker";
+import { ValuesSurvey } from "@/components/ValuesSurvey";
 import type { User } from "@/lib/types";
 
 type Tab = "login" | "signup";
@@ -73,10 +74,10 @@ export function AuthPage() {
           region: f.get("region"),
           mbti: f.get("mbti"),
           keywords: f.getAll("kw"),
+          values: JSON.parse(String(f.get("values") || "{}")),
           pref_genders: f.getAll("pref_genders"),
           pref_age_min: f.get("pref_age_min"),
           pref_age_max: f.get("pref_age_max"),
-          pref_keywords: f.getAll("pref_kw"),
         });
       }
       const data = await api<{ token: string; user: User }>("/auth/signup", {
@@ -224,8 +225,17 @@ export function AuthPage() {
             <KeywordPicker
               name="kw"
               label="나를 나타내는 키워드 (1~5개)"
-              hint="관심사·성향을 골라주세요. 추천에 활용돼요."
+              hint="관심사·성향을 골라주세요. 비슷할수록 추천 상위로 이어져요."
             />
+
+            <div className="rounded-xl border border-line bg-cream/50 p-4">
+              <p className="text-sm font-medium text-ink-soft">가치관 (선택)</p>
+              <p className="mt-0.5 mb-2 text-xs text-ink-faint">
+                답한 항목이 같은 상대에게 가산점이 붙어요. 원치 않으면 비워두세요.
+              </p>
+              <ValuesSurvey />
+            </div>
+
             <div className="rounded-xl border border-line bg-cream/50 p-4">
               <p className="text-sm font-medium text-ink-soft">상대방 선호 조건 (선택)</p>
               <div className="mt-2 flex gap-4 text-sm text-ink-soft">
@@ -239,13 +249,6 @@ export function AuthPage() {
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input name="pref_age_min" type="number" placeholder="최소 나이" className={inputCls} />
                 <input name="pref_age_max" type="number" placeholder="최대 나이" className={inputCls} />
-              </div>
-              <div className="mt-3">
-                <KeywordPicker
-                  name="pref_kw"
-                  label="선호 키워드 (최대 5개)"
-                  hint="상대에게 바라는 키워드. 추천 순위에 유사도로 반영돼요(유의어도 연결)."
-                />
               </div>
               <p className="mt-2 text-xs text-ink-faint">※ 비워두면 조건 제한 없이 추천돼요.</p>
             </div>

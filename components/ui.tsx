@@ -54,6 +54,32 @@ export function KeywordChips({ keywords }: { keywords: string[] }) {
   );
 }
 
+const VALUE_LABEL: Record<string, string> = {
+  smoke: "흡연",
+  drink: "음주",
+  tattoo: "문신",
+  religion: "종교",
+};
+
+// 가치관 설문 값(흡연/음주/문신/종교)을 작은 라벨 칩으로 표시.
+export function ValueChips({ values }: { values?: Record<string, string> }) {
+  const entries = Object.entries(values || {}).filter(([, v]) => v);
+  if (entries.length === 0) return null;
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {entries.map(([k, v]) => (
+        <span
+          key={k}
+          className="rounded-full border border-line bg-white px-2 py-0.5 text-xs text-ink-soft"
+        >
+          <span className="text-ink-faint">{VALUE_LABEL[k] ?? k} </span>
+          {v}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export function Spinner() {
   return (
     <div className="flex justify-center py-16">

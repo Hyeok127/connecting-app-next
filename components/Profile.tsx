@@ -4,8 +4,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { uploadPhotos } from "@/lib/upload";
-import { Avatar, Badge, KeywordChips, Spinner, Empty } from "@/components/ui";
+import { Avatar, Badge, KeywordChips, ValueChips, Spinner, Empty } from "@/components/ui";
 import { KeywordPicker } from "@/components/KeywordPicker";
+import { ValuesSurvey } from "@/components/ValuesSurvey";
 
 const inputCls =
   "mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-wine-500 focus:ring-2 focus:ring-wine-100";
@@ -25,20 +26,17 @@ export function Profile() {
   const [invite, setInvite] = useState<{ code: string; link: string } | null>(null);
   const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [stats, setStats] = useState<{ invited: number; matched: number }>({ invited: 0, matched: 0 });
-  const [prefKeywords, setPrefKeywords] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [inv, invs, prefs] = await Promise.all([
+      const [inv, invs] = await Promise.all([
         api<{ code: string; link: string }>("/invite"),
         api<{ invitees: Invitee[]; stats: { invited: number; matched: number } }>("/me/invitees"),
-        api<{ preferences: { keywords?: string[] } | null }>("/me/preferences"),
       ]);
       setInvite(inv);
       setInvitees(invs.invitees);
       setStats(invs.stats);
-      setPrefKeywords(prefs.preferences?.keywords ?? []);
     } finally {
       /* await Promise.all 이후 setState */
     }
@@ -60,6 +58,7 @@ export function Profile() {
         region: f.get("region"),
         mbti: f.get("mbti"),
         keywords: f.getAll("kw"),
+        values: JSON.parse(String(f.get("values") || "{}")),
         contact: f.get("contact"),
       };
       if (photos) body.photos = photos;
@@ -133,6 +132,11 @@ export function Profile() {
                 <KeywordChips keywords={user.keywords || []} />
               </div>
             )}
+            {isMember && user.values && Object.keys(user.values).length > 0 && (
+              <div className="mt-1.5">
+                <ValueChips values={user.values} />
+              </div>
+            )}
           </div>
         </div>
         {isMember && (user.photos || []).length > 0 && (
@@ -166,6 +170,10 @@ export function Profile() {
               defaultSelected={user.keywords || []}
             />
           </div>
+          <div className="mt-4 rounded-xl border border-line bg-cream/40 p-4">
+            <p className="mb-2 text-sm font-medium text-ink-soft">가치관 (선택)</p>
+            <ValuesSurvey defaultValues={user.values || {}} />
+          </div>
           <label className={`${labelCls} mt-3`}>
             연락처 <input name="contact" defaultValue={user.contact ?? ""} placeholder="카톡ID 또는 전화번호" className={inputCls} />
           </label>
@@ -196,14 +204,6 @@ export function Profile() {
           </div>
           <input name="jobs" placeholder="직업 (콤마 구분)" className={`mt-2 ${inputCls}`} />
           <input name="regions" placeholder="사는 곳 (콤마 구분)" className={`mt-2 ${inputCls}`} />
-          <div className="mt-3">
-            <KeywordPicker
-              name="pref_kw"
-              label="선호 키워드 (최대 5개)"
-              hint="상대에게 바라는 키워드. 추천 순위에 유사도로 반영돼요(유의어도 연결)."
-              defaultSelected={prefKeywords}
-            />
-          </div>
           <button className="mt-5 w-full rounded-xl bg-ink py-2.5 text-sm font-semibold text-paper transition hover:bg-ink/85">
             선호 조건 저장
           </button>

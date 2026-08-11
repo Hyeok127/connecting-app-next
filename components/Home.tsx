@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
-import { Avatar, KeywordChips, Spinner, Empty } from "@/components/ui";
+import { Avatar, KeywordChips, ValueChips, Spinner, Empty } from "@/components/ui";
 
 interface Candidate {
   id: string;
@@ -11,10 +11,10 @@ interface Candidate {
   gender: string | null;
   age: number | null;
   job: string | null;
-  workplace: string | null;
   region: string | null;
   mbti: string | null;
   keywords: string[];
+  values?: Record<string, string>;
 }
 
 export function Home() {
@@ -100,7 +100,9 @@ export function Home() {
                         </span>
                       </div>
                       <p className="truncate text-sm text-ink-soft">
-                        {c.job ?? ""} · 근무: {c.workplace ?? "-"} · 사는 곳: {c.region ?? "-"}
+                        {c.job ?? ""}
+                        {c.job && c.region ? " · " : ""}
+                        {c.region ? `사는 곳: ${c.region}` : ""}
                       </p>
                     </div>
                   </div>
@@ -108,6 +110,11 @@ export function Home() {
                     {c.mbti && <span className="text-xs font-medium text-gold-600">{c.mbti}</span>}
                     <KeywordChips keywords={c.keywords} />
                   </div>
+                  {c.values && Object.keys(c.values).length > 0 && (
+                    <div className="mt-2">
+                      <ValueChips values={c.values} />
+                    </div>
+                  )}
                   <button
                     disabled={inRank}
                     onClick={() => add(c.id)}

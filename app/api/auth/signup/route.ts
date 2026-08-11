@@ -8,6 +8,7 @@ import { SIGNUP_IP_MAX } from "@/lib/constants";
 import { genId, nowMs, parseArr, PHOTO_PATH_RE, genInviteCode } from "@/lib/utils";
 import { publicUserWithPhotos } from "@/lib/serialize";
 import { cleanKeywords } from "@/lib/keywords";
+import { cleanValues } from "@/lib/values";
 import type { UserRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -59,11 +60,13 @@ export async function POST(req: NextRequest) {
     if (photos.length > 3) return fail("사진은 최대 3장까지 가능합니다.", 400);
     if (!photos.every((p) => PHOTO_PATH_RE.test(p)))
       return fail("사진 경로가 올바르지 않습니다.", 400);
+    // 가치관 설문(술/담배/문신/종교)은 근무지 폐지로 빈 workplace 컬럼에 JSON으로 저장(DDL 회피).
+    const values = cleanValues(body.values);
     cols = {
       gender: String(body.gender),
       age,
       job: String(body.job ?? "").trim() || null,
-      workplace: String(body.workplace ?? "").trim() || null,
+      workplace: Object.keys(values).length ? JSON.stringify(values) : null,
       region: String(body.region ?? "").trim() || null,
       mbti: String(body.mbti ?? "").trim().toUpperCase() || null,
       keywords: JSON.stringify(cleanKw),
@@ -107,23 +110,21 @@ export async function POST(req: NextRequest) {
     return fail(error.message, 400);
   }
 
-  // 가입 시 선호 조건 (선택, R24)
+  // 가입 시 선호 조건 (선택, R24) — 성별/나이/직업/지역 하드 필터만. 선호 키워드는 폐지.
   if (role === "member") {
     const genders = parseArr(body.pref_genders).filter((g) => ["남성", "여성"].includes(g));
     const jobs = parseArr(body.pref_jobs);
-    // 선호 키워드(최대 5)는 workplaces 컬럼을 재사용해 저장(DDL 회피). 고정 세트로만.
-    const prefKeywords = cleanKeywords(parseArr(body.pref_keywords));
     const regions = parseArr(body.pref_regions);
     const ageMin = body.pref_age_min ? Number(body.pref_age_min) : null;
     const ageMax = body.pref_age_max ? Number(body.pref_age_max) : null;
-    if (genders.length || ageMin || ageMax || jobs.length || prefKeywords.length || regions.length) {
+    if (genders.length || ageMin || ageMax || jobs.length || regions.length) {
       await sb.from("preferences").insert({
         user_id: id,
         genders: JSON.stringify(genders),
         age_min: ageMin,
         age_max: ageMax,
         jobs: JSON.stringify(jobs),
-        workplaces: JSON.stringify(prefKeywords), // ← 선호 키워드
+        workplaces: "[]", // 미사용
         regions: JSON.stringify(regions),
         mbtis: "[]",
         updated_at: nowMs(),

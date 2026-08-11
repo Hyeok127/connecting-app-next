@@ -36,10 +36,10 @@ export interface User {
   gender: string | null;
   age: number | null;
   job: string | null;
-  workplace: string | null;
   region: string | null;
   mbti: string | null;
   keywords: string[] | null;
+  values: Record<string, string>; // 가치관 설문(술/담배/문신/종교)
   photos: string[] | null;
   contact: string | null;
   invite_code: string | null;

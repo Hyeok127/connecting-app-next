@@ -2,6 +2,7 @@
 import type { UserRow } from "@/lib/types";
 import { PHOTO_BUCKET } from "@/lib/constants";
 import { getSupabase } from "@/lib/supabase";
+import { parseValues } from "@/lib/values";
 
 export interface PublicUser {
   id: string;
@@ -10,10 +11,10 @@ export interface PublicUser {
   gender: string | null;
   age: number | null;
   job: string | null;
-  workplace: string | null;
   region: string | null;
   mbti: string | null;
   keywords: string[];
+  values: Record<string, string>; // 가치관 설문(users.workplace에 JSON 저장) — 근무지 컬럼 재사용
   status: UserRow["status"];
   createdAt: number;
   photos?: string[];
@@ -37,10 +38,10 @@ export function publicUser(u: UserRow, opts: { photos?: boolean; contact?: boole
     gender: u.gender,
     age: u.age,
     job: u.job,
-    workplace: u.workplace,
     region: u.region,
     mbti: u.mbti,
     keywords: parseJsonArray(u.keywords),
+    values: parseValues(u.workplace), // workplace 컬럼을 가치관 JSON 저장에 재사용
     status: u.status,
     createdAt: u.created_at,
   };
