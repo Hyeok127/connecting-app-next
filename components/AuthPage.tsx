@@ -75,6 +75,7 @@ export function AuthPage() {
           pref_genders: f.getAll("pref_genders"),
           pref_age_min: f.get("pref_age_min"),
           pref_age_max: f.get("pref_age_max"),
+          pref_keywords: f.getAll("pref_kw"),
         });
       }
       const data = await api<{ token: string; user: User }>("/auth/signup", {
@@ -240,6 +241,17 @@ export function AuthPage() {
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input name="pref_age_min" type="number" placeholder="최소 나이" className={inputCls} />
                 <input name="pref_age_max" type="number" placeholder="최대 나이" className={inputCls} />
+              </div>
+              <div className="mt-2">
+                <span className="text-sm font-medium text-ink-soft">선호 키워드 (1~3개)</span>
+                <div className="mt-1 grid grid-cols-3 gap-2">
+                  <input name="pref_kw" placeholder="예: 여행" className={inputCls} />
+                  <input name="pref_kw" placeholder="예: 독서" className={inputCls} />
+                  <input name="pref_kw" placeholder="예: 운동" className={inputCls} />
+                </div>
+                <p className="mt-1 text-xs text-ink-faint">
+                  ※ 상대에게 바라는 키워드예요. 추천 순위에 키워드 유사도로 반영돼요.
+                </p>
               </div>
               <p className="mt-2 text-xs text-ink-faint">※ 비워두면 조건 제한 없이 추천돼요.</p>
             </div>

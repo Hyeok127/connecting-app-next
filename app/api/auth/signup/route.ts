@@ -109,18 +109,19 @@ export async function POST(req: NextRequest) {
   if (role === "member") {
     const genders = parseArr(body.pref_genders).filter((g) => ["남성", "여성"].includes(g));
     const jobs = parseArr(body.pref_jobs);
-    const workplaces = parseArr(body.pref_workplaces);
+    // 선호 키워드(1~3)는 workplaces 컬럼을 재사용해 저장(DDL 회피).
+    const prefKeywords = parseArr(body.pref_keywords).slice(0, 3);
     const regions = parseArr(body.pref_regions);
     const ageMin = body.pref_age_min ? Number(body.pref_age_min) : null;
     const ageMax = body.pref_age_max ? Number(body.pref_age_max) : null;
-    if (genders.length || ageMin || ageMax || jobs.length || workplaces.length || regions.length) {
+    if (genders.length || ageMin || ageMax || jobs.length || prefKeywords.length || regions.length) {
       await sb.from("preferences").insert({
         user_id: id,
         genders: JSON.stringify(genders),
         age_min: ageMin,
         age_max: ageMax,
         jobs: JSON.stringify(jobs),
-        workplaces: JSON.stringify(workplaces),
+        workplaces: JSON.stringify(prefKeywords), // ← 선호 키워드
         regions: JSON.stringify(regions),
         mbtis: "[]",
         updated_at: nowMs(),
