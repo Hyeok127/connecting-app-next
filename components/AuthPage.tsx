@@ -155,6 +155,14 @@ export function AuthPage() {
         </form>
       ) : (
         <form onSubmit={handleSignup} className="rise-in rounded-2xl border border-line bg-white p-7 shadow-sm">
+          <div className="mb-5 rounded-xl border border-gold-100 bg-gold-100/30 p-4 text-xs leading-relaxed text-ink-soft">
+            <p className="font-medium text-ink">개인정보는 이렇게 다뤄요</p>
+            <p className="mt-1">
+              · 사진은 가입 때 받지 않아요 — 매칭 성사 후 서로 동의하면 그때 교환됩니다.
+              <br />· 연락처는 매칭을 수락할 때만 입력하고, 성사된 상대에게만 공개됩니다.
+              <br />· 본명 대신 닉네임으로 활동하고, 직업·직장 등은 모두 선택이에요.
+            </p>
+          </div>
           <label className={labelCls}>
             초대코드
             <input
@@ -211,8 +219,8 @@ export function AuthPage() {
               <input name="age" type="number" min={19} max={99} className={inputCls} />
             </label>
             <label className={labelCls}>
-              직업 (선택)
-              <input name="job" placeholder="예: 디자이너 — 대략적으로만" className={inputCls} />
+              직업 및 직장 (선택)
+              <input name="job" placeholder="예: 개발자 / 간호사" className={inputCls} />
             </label>
             <label className={labelCls}>
               사는 곳 (선택)
@@ -251,16 +259,6 @@ export function AuthPage() {
                 <input name="pref_age_max" type="number" placeholder="최대 나이" className={inputCls} />
               </div>
               <p className="mt-2 text-xs text-ink-faint">※ 비워두면 조건 제한 없이 추천돼요.</p>
-            </div>
-
-            <div className="rounded-xl border border-gold-100 bg-gold-100/30 p-4 text-xs leading-relaxed text-ink-soft">
-              <p className="font-medium text-ink">개인정보는 이렇게 다뤄요</p>
-              <p className="mt-1">
-                · 사진은 가입 때 받지 않아요 — 매칭 성사 후 서로 동의하면 그때 교환됩니다.
-                <br />
-                · 연락처는 매칭을 수락할 때만 입력하고, 성사된 상대에게만 공개됩니다.
-                <br />· 직장·상세 주소 등은 아예 수집하지 않아요.
-              </p>
             </div>
           </div>
 

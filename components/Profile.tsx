@@ -154,7 +154,7 @@ export function Profile() {
           <h3 className="mb-4 font-display font-semibold text-ink">프로필 수정</h3>
           <div className="grid grid-cols-2 gap-3">
             <label className={labelCls}>
-              직업 (선택) <input name="job" defaultValue={user.job ?? ""} className={inputCls} />
+              직업 및 직장 (선택) <input name="job" defaultValue={user.job ?? ""} className={inputCls} />
             </label>
             <label className={labelCls}>
               사는 곳 (선택) <input name="region" defaultValue={user.region ?? ""} className={inputCls} />
