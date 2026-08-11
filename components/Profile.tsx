@@ -32,6 +32,14 @@ export function Profile() {
   const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [stats, setStats] = useState<{ invited: number; matched: number }>({ invited: 0, matched: 0 });
   const [valuePrefs, setValuePrefs] = useState<Record<string, string[]>>({});
+  const [prefs, setPrefs] = useState<{
+    genders: string[];
+    age_min: number | null;
+    age_max: number | null;
+    jobs: string[];
+    regions: string[];
+    mbtis: string[];
+  } | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
   const [delBusy, setDelBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -41,16 +49,17 @@ export function Profile() {
 
   const load = useCallback(async () => {
     try {
-      const [inv, invs, prefs, em] = await Promise.all([
+      const [inv, invs, pr, em] = await Promise.all([
         api<{ code: string; link: string }>("/invite"),
         api<{ invitees: Invitee[]; stats: { invited: number; matched: number } }>("/me/invitees"),
-        api<{ valuePrefs: Record<string, string[]> }>("/me/preferences"),
+        api<{ preferences: typeof prefs; valuePrefs: Record<string, string[]> }>("/me/preferences"),
         api<{ email: string | null }>("/me/email"),
       ]);
       setInvite(inv);
       setInvitees(invs.invitees);
       setStats(invs.stats);
-      setValuePrefs(prefs.valuePrefs ?? {});
+      setValuePrefs(pr.valuePrefs ?? {});
+      setPrefs(pr.preferences ?? null);
       setEmail(em.email ?? "");
     } finally {
       /* await Promise.all 이후 setState */
@@ -99,6 +108,7 @@ export function Profile() {
           age_max: f.get("age_max"),
           jobs: f.get("jobs"),
           regions: f.get("regions"),
+          mbtis: prefs?.mbtis ?? [], // 폼엔 없지만 기존 값 유지(빈 배열로 덮어쓰지 않도록)
           value_prefs: JSON.parse(String(f.get("value_prefs") || "{}")),
         }),
       });
@@ -252,22 +262,24 @@ export function Profile() {
       )}
 
       {isMember && (
-        <form onSubmit={savePrefs} className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
-          <h3 className="mb-4 font-display font-semibold text-ink">상대방 선호 조건</h3>
+        // key로 폼을 prefs 로드 후 리마운트 → 비제어 입력의 defaultValue가 저장값으로 채워짐
+        <form key={prefs ? "loaded" : "loading"} onSubmit={savePrefs} className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
+          <h3 className="mb-1 font-display font-semibold text-ink">상대방 선호 조건</h3>
+          <p className="mb-4 text-xs text-ink-faint">이 조건에 맞는 사람만 추천에 나와요. 비워두면 제한 없이 추천됩니다.</p>
           <div className="flex gap-4 text-sm text-ink-soft">
             <label className="flex items-center gap-1">
-              <input type="checkbox" name="pgender" value="남성" /> 남성
+              <input type="checkbox" name="pgender" value="남성" defaultChecked={prefs?.genders.includes("남성")} /> 남성
             </label>
             <label className="flex items-center gap-1">
-              <input type="checkbox" name="pgender" value="여성" /> 여성
+              <input type="checkbox" name="pgender" value="여성" defaultChecked={prefs?.genders.includes("여성")} /> 여성
             </label>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <input name="age_min" type="number" placeholder="최소 나이" className={inputCls} />
-            <input name="age_max" type="number" placeholder="최대 나이" className={inputCls} />
+            <input name="age_min" type="number" placeholder="최소 나이" defaultValue={prefs?.age_min ?? ""} className={inputCls} />
+            <input name="age_max" type="number" placeholder="최대 나이" defaultValue={prefs?.age_max ?? ""} className={inputCls} />
           </div>
-          <input name="jobs" placeholder="직업 (콤마 구분)" className={`mt-2 ${inputCls}`} />
-          <input name="regions" placeholder="사는 곳 (콤마 구분)" className={`mt-2 ${inputCls}`} />
+          <input name="jobs" placeholder="직업 (콤마 구분)" defaultValue={(prefs?.jobs ?? []).join(", ")} className={`mt-2 ${inputCls}`} />
+          <input name="regions" placeholder="사는 곳 (콤마 구분)" defaultValue={(prefs?.regions ?? []).join(", ")} className={`mt-2 ${inputCls}`} />
           <div className="mt-4">
             <p className="text-sm font-medium text-ink-soft">상대에게 바라는 가치관</p>
             <p className="mt-0.5 mb-2 text-xs text-ink-faint">허용할 값을 고르면 그런 상대가 추천 상위로 와요. 안 고르면 상관없음.</p>
