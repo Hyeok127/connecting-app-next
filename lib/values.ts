@@ -2,22 +2,45 @@
 // 각 항목은 선택(무응답 허용). 저장은 DDL 없이 users.workplace(근무지 폐지로 빈 컬럼)에
 // JSON으로 기록한다. 매칭에서는 "같은 답이면 가산점"(취미 키워드는 유사도, 가치관은 일치).
 
+// value: 저장·매칭에 쓰는 짧은 값. label: 선택 화면에 보이는 기준 포함 문구.
+export interface ValueOption {
+  value: string;
+  label: string;
+}
 export interface ValueDimension {
   key: string;
   label: string;
-  options: string[];
+  options: ValueOption[];
 }
 
+const O = (value: string, label?: string): ValueOption => ({ value, label: label ?? value });
+
 export const VALUE_DIMENSIONS: ValueDimension[] = [
-  { key: "smoke", label: "흡연", options: ["비흡연", "가끔", "흡연", "전자담배"] },
-  { key: "drink", label: "음주", options: ["안 마심", "가끔", "즐김"] },
-  { key: "tattoo", label: "문신", options: ["없음", "있음"] },
-  { key: "religion", label: "종교", options: ["무교", "기독교", "천주교", "불교", "기타"] },
+  {
+    key: "smoke",
+    label: "흡연",
+    options: [O("비흡연"), O("가끔", "가끔 (월 몇 번·술자리 정도)"), O("자주", "자주 (거의 매일)"), O("전자담배")],
+  },
+  {
+    key: "drink",
+    label: "음주",
+    options: [O("안 마심"), O("가볍게", "가볍게 (월 1~2회)"), O("즐기는 편", "즐기는 편 (주 1~2회)"), O("자주", "자주 (주 3회 이상)")],
+  },
+  {
+    key: "tattoo",
+    label: "문신",
+    options: [O("없음"), O("작게", "작게 (평소 가려지는)"), O("크게", "크게·여러 개")],
+  },
+  {
+    key: "religion",
+    label: "종교",
+    options: [O("무교"), O("기독교"), O("천주교"), O("불교"), O("기타")],
+  },
 ];
 
 export const VALUE_KEYS = VALUE_DIMENSIONS.map((d) => d.key);
 const OPTION_SET: Record<string, Set<string>> = Object.fromEntries(
-  VALUE_DIMENSIONS.map((d) => [d.key, new Set(d.options)])
+  VALUE_DIMENSIONS.map((d) => [d.key, new Set(d.options.map((o) => o.value))])
 );
 
 // 유효한 (key, option) 쌍만 남긴다. 무응답/빈값/미허용값은 제거.

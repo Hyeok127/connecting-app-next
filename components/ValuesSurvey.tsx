@@ -22,19 +22,19 @@ export function ValuesSurvey({ defaultValues = {} }: { defaultValues?: Record<st
             </span>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {d.options.map((opt) => {
-                const on = sel[d.key] === opt;
+                const on = sel[d.key] === opt.value;
                 return (
                   <button
-                    key={opt}
+                    key={opt.value}
                     type="button"
-                    onClick={() => pick(d.key, opt)}
+                    onClick={() => pick(d.key, opt.value)}
                     className={
                       on
                         ? "rounded-full border border-wine-600 bg-wine-600 px-2.5 py-1 text-xs font-medium text-paper"
                         : "rounded-full border border-line bg-white px-2.5 py-1 text-xs text-ink-soft transition hover:border-wine-500 hover:text-wine-700"
                     }
                   >
-                    {opt}
+                    {opt.label}
                   </button>
                 );
               })}
