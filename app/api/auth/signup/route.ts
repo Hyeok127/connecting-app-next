@@ -52,8 +52,9 @@ export async function POST(req: NextRequest) {
       return fail("나이를 확인해주세요.", 400);
     if (keywords.length !== 3)
       return fail("키워드는 정확히 3개 입력해주세요.", 400); // R2
-    if (photos.length < 1 || photos.length > 3)
-      return fail("사진을 1~3장 올려주세요.", 400); // R2
+    // 사진은 가입 시 받지 않는다 — 매칭 성사 후 상호 동의 교환(004)으로 이동.
+    // 값이 넘어오는 경우(프로필에서 미리 등록 등)만 형식 검증한다.
+    if (photos.length > 3) return fail("사진은 최대 3장까지 가능합니다.", 400);
     if (!photos.every((p) => PHOTO_PATH_RE.test(p)))
       return fail("사진 경로가 올바르지 않습니다.", 400);
     cols = {

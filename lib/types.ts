@@ -72,6 +72,8 @@ export interface MatchRow {
   state: MatchState;
   a_response: ResponseValue;
   b_response: ResponseValue;
+  a_photo_consent: number; // 004: 매칭 후 사진 교환 동의 (0/1)
+  b_photo_consent: number;
   respond_deadline: number;
   created_at: number;
   closed_at: number | null;

@@ -10,10 +10,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_STYLE: Record<string, string> = {
-  active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  match_pending: "bg-amber-50 text-amber-700 border-amber-200",
-  dating: "bg-rose-50 text-rose-700 border-rose-200",
-  paused: "bg-slate-100 text-slate-600 border-slate-200",
+  active: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  match_pending: "bg-gold-100 text-gold-600 border-gold-100",
+  dating: "bg-wine-50 text-wine-700 border-wine-100",
+  paused: "bg-cream text-ink-soft border-line",
   suspended: "bg-red-50 text-red-700 border-red-200",
 };
 
@@ -22,7 +22,7 @@ export function Avatar({ name, size = "md" }: { name?: string; size?: "md" | "lg
     size === "lg" ? "w-14 h-14 text-xl" : size === "sm" ? "w-8 h-8 text-sm" : "w-11 h-11 text-lg";
   return (
     <div
-      className={`${cls} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-pink-500 font-bold text-white`}
+      className={`${cls} flex shrink-0 items-center justify-center rounded-full bg-wine-700 font-display font-semibold text-paper ring-1 ring-wine-900/20`}
     >
       {String(name || "?")[0]}
     </div>
@@ -45,7 +45,7 @@ export function KeywordChips({ keywords }: { keywords: string[] }) {
       {(keywords || []).map((k, i) => (
         <span
           key={i}
-          className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-600"
+          className="rounded-full border border-line bg-cream px-2.5 py-0.5 text-xs font-medium text-ink-soft"
         >
           {k}
         </span>
@@ -57,11 +57,15 @@ export function KeywordChips({ keywords }: { keywords: string[] }) {
 export function Spinner() {
   return (
     <div className="flex justify-center py-16">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-rose-200 border-t-rose-500" />
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-wine-100 border-t-wine-600" />
     </div>
   );
 }
 
 export function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="py-4 text-sm text-slate-500">{children}</p>;
+  return (
+    <div className="rounded-2xl border border-dashed border-line bg-cream/40 px-6 py-8 text-center text-sm text-ink-faint">
+      {children}
+    </div>
+  );
 }

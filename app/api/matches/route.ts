@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authFromToken, bearerToken, getUserById } from "@/lib/auth";
 import { ok, unauthorized, forbidden } from "@/lib/http";
 import { expireOverdue } from "@/lib/batch";
-import { publicUserWithPhotos } from "@/lib/serialize";
+import { publicUser, publicUserWithPhotos } from "@/lib/serialize";
 import { commonConnector } from "@/lib/invite";
 import type { MatchRow, UserRow } from "@/lib/types";
 
@@ -26,15 +26,25 @@ export async function GET(req: NextRequest) {
 
   const list: unknown[] = [];
   for (const m of (rows as MatchRow[]) ?? []) {
-    const other = await getUserById(m.user_a === user.id ? m.user_b : m.user_a);
+    const isA = m.user_a === user.id;
+    const other = await getUserById(isA ? m.user_b : m.user_a);
     if (!other) continue;
-    const counterpart = await publicUserWithPhotos(other); // pending부터 사진 공개 §3-4
+    // 사진은 매칭 성사 후 양측이 모두 교환에 동의했을 때만 공개한다(004).
+    const myConsent = (isA ? m.a_photo_consent : m.b_photo_consent) === 1;
+    const partnerConsent = (isA ? m.b_photo_consent : m.a_photo_consent) === 1;
+    const exchanged = m.state === "accepted" && myConsent && partnerConsent;
+    const counterpart = exchanged
+      ? await publicUserWithPhotos(other)
+      : publicUser(other);
     const item: Record<string, unknown> = {
       id: m.id,
       state: m.state,
-      my_response: m.user_a === user.id ? m.a_response : m.b_response,
+      my_response: isA ? m.a_response : m.b_response,
       cycle_date: m.cycle_date,
       respond_deadline: m.respond_deadline,
+      my_photo_consent: myConsent,
+      partner_photo_consent: partnerConsent,
+      photos_exchanged: exchanged,
       counterpart,
     };
     if (m.state === "accepted") {

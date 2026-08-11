@@ -18,7 +18,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {msg && (
         <div className="fixed inset-x-0 bottom-8 z-50 flex justify-center px-4">
-          <div className="max-w-md rounded-full bg-slate-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+          <div className="max-w-md rounded-full bg-ink/95 px-5 py-2.5 text-sm font-medium text-paper shadow-lg">
             {msg}
           </div>
         </div>

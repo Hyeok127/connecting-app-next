@@ -66,11 +66,11 @@ export function Admin() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-900">관리자 — 전체 회원</h2>
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="font-display text-xl font-bold tracking-tight text-ink">관리자 — 전체 회원</h2>
         <button
           onClick={runBatch}
-          className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white"
+          className="rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85"
         >
           수동 배치 실행
         </button>
@@ -80,14 +80,14 @@ export function Admin() {
       ) : (
         <div className="space-y-3">
           {users.map((u) => (
-            <div key={u.id} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={u.id} className="flex items-start gap-3 rounded-2xl border border-line bg-white p-4 shadow-sm">
               <Avatar name={u.name} size="sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <strong className="text-slate-900">{u.name}</strong>
+                  <strong className="text-ink">{u.name}</strong>
                   <Badge status={u.status} />
                 </div>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                <p className="mt-1 text-xs leading-relaxed text-ink-faint">
                   {u.role === "member" ? "일반" : "주선자"}
                   {u.is_admin && " · 관리자"}
                   {u.gender && ` · ${u.gender} ${u.age ?? "?"}세`}

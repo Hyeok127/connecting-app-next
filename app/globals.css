@@ -1,18 +1,49 @@
 @import "tailwindcss";
 
+/* 디자인 토큰 — 따뜻한 아이보리 종이 위에 잉크와 와인.
+   프리미엄 매치메이킹 톤: 채도 낮은 배경, 딥 와인 액센트, 골드 포인트. */
+@theme {
+  --color-paper: #faf7f2;
+  --color-cream: #f3ede3;
+  --color-line: #e7dfd3;
+  --color-ink: #262019;
+  --color-ink-soft: #6f645a;
+  --color-ink-faint: #a2988c;
+
+  --color-wine-900: #4f1a25;
+  --color-wine-700: #772335;
+  --color-wine-600: #8c2a3e;
+  --color-wine-500: #a23c50;
+  --color-wine-100: #f1dde1;
+  --color-wine-50: #f9f0f1;
+
+  --color-gold-600: #a8834e;
+  --color-gold-100: #eee3cf;
+
+  --font-sans:
+    "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo",
+    "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-display: "Noto Serif KR", "Pretendard Variable", Pretendard, serif;
+}
+
 body {
-  font-family:
-    "Pretendard Variable",
-    Pretendard,
-    -apple-system,
-    BlinkMacSystemFont,
-    system-ui,
-    Roboto,
-    "Helvetica Neue",
-    "Segoe UI",
-    "Apple SD Gothic Neo",
-    "Noto Sans KR",
-    "Malgun Gothic",
-    sans-serif;
-  background: #f8fafc;
+  font-family: var(--font-sans);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* 카드 진입 모션 — 과하지 않게 한 번만 */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: rise-in 0.35s ease-out both;
 }
