@@ -71,3 +71,8 @@ export function valueAgreement(a: Record<string, string>, b: Record<string, stri
   for (const key of VALUE_KEYS) if (a[key] && b[key] && a[key] === b[key]) n++;
   return n;
 }
+
+// 일치한 가치관 항목의 라벨(예: ["음주","종교"]) — 추천 사유 표시용.
+export function matchedValueLabels(a: Record<string, string>, b: Record<string, string>): string[] {
+  return VALUE_DIMENSIONS.filter((d) => a[d.key] && b[d.key] && a[d.key] === b[d.key]).map((d) => d.label);
+}

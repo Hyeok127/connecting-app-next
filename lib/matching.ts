@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { MAX_RANK } from "@/lib/constants";
 import type { PreferencesRow, UserRow } from "@/lib/types";
 import { parseJsonArray } from "@/lib/serialize";
-import { parseValues, valueAgreement } from "@/lib/values";
+import { parseValues, valueAgreement, matchedValueLabels } from "@/lib/values";
 import keywordVectors from "@/lib/keyword_vectors.json";
 
 // 사전계산 임베딩(정규화+centering된 단위벡터). 런타임엔 이 벡터 코사인만 쓴다(API/모델 없음).
@@ -103,7 +103,15 @@ export function keywordSimilarity(myKw: string[], theirKw: string[]): number {
 
 const VALUE_WEIGHT = 1.0; // 가치관 한 항목 일치당 가산점 (키워드 유사도 보조)
 
-export async function recommendationsFor(meId: string, me: UserRow): Promise<UserRow[]> {
+// 추천 결과 + "왜 추천됐는지" 사유(점수·겹친 키워드·일치 가치관).
+export interface Recommendation {
+  user: UserRow;
+  score: number;
+  sharedKeywords: string[]; // 후보 키워드 중 내 키워드와 정확/유사(코사인≥0.4) 매칭된 것
+  matchedValues: string[]; // 일치한 가치관 라벨(흡연/음주/문신/종교)
+}
+
+export async function recommendationsFor(meId: string, me: UserRow): Promise<Recommendation[]> {
   const sb = getSupabase();
   // 후보 전체 + 필요한 부가정보를 "일괄 조회"한다(후보마다 개별 쿼리 X — N+1 제거).
   const { data: rows } = await sb
@@ -136,24 +144,23 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Use
   const myKw = parseJsonArray(me.keywords);
   const myVals = parseValues(me.workplace); // 가치관은 users.workplace(JSON)에 저장
 
-  const scored: { u: UserRow; sim: number }[] = [];
+  const scored: (Recommendation & { sim: number })[] = [];
   for (const u of candidates) {
     if (historySet.has(u.id)) continue; // R7
     if ((rankCount.get(u.id) ?? 0) >= 3) continue; // R16
     if (!fits(myPrefs, u)) continue; // R6
     if (!fits(prefsMap.get(u.id) ?? null, me)) continue; // R6 (상호)
+    const uKw = parseJsonArray(u.keywords);
+    const uVals = parseValues(u.workplace);
     // 취미 키워드는 유사할수록, 가치관(술/담배/문신/종교)은 같을수록 가산.
-    const sim =
-      keywordSimilarity(myKw, parseJsonArray(u.keywords)) +
-      VALUE_WEIGHT * valueAgreement(myVals, parseValues(u.workplace));
-    scored.push({ u, sim });
+    const sim = keywordSimilarity(myKw, uKw) + VALUE_WEIGHT * valueAgreement(myVals, uVals);
+    // 사유: 후보 키워드 중 내 키워드와 정확/유사 매칭된 것 + 일치 가치관
+    const sharedKeywords = uKw.filter((ck) => myKw.some((mk) => cosOrExact(ck, mk) > 0));
+    scored.push({ user: u, score: sim, sim, sharedKeywords, matchedValues: matchedValueLabels(myVals, uVals) });
   }
   // 유사도 우선, 동점이면 신뢰점수·가입순
   scored.sort(
-    (a, b) =>
-      b.sim - a.sim ||
-      b.u.trust_score - a.u.trust_score ||
-      b.u.created_at - a.u.created_at
+    (a, b) => b.sim - a.sim || b.user.trust_score - a.user.trust_score || b.user.created_at - a.user.created_at
   );
-  return scored.slice(0, MAX_RANK).map((x) => x.u);
+  return scored.slice(0, MAX_RANK).map(({ user, score, sharedKeywords, matchedValues }) => ({ user, score, sharedKeywords, matchedValues }));
 }

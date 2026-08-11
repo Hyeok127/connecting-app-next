@@ -14,7 +14,19 @@ export async function GET(req: NextRequest) {
   if (user.status === "suspended") return forbidden("정지된 계정입니다. 운영자에게 문의해주세요."); // R26
   if (user.status === "dating") return ok({ candidates: [] }); // R14
 
-  // publicUser에 photos/contact 미포함 (R5)
-  const candidates = (await recommendationsFor(user.id, user)).map((u) => publicUser(u));
+  const recs = await recommendationsFor(user.id, user);
+  const maxScore = Math.max(0.0001, ...recs.map((r) => r.score));
+
+  // publicUser에 photos/contact 미포함(R5) + 추천 사유(궁합 강도·겹친 키워드·일치 가치관)
+  const candidates = recs.map((r) => ({
+    ...publicUser(r.user),
+    match: {
+      // 강도: 리스트 내 최고점 대비 비율(최소 0.15로 가시성 확보) → UI에서 진하기로 표현
+      strength: Math.max(0.15, r.score / maxScore),
+      score: Math.round(r.score * 10) / 10,
+      sharedKeywords: r.sharedKeywords,
+      matchedValues: r.matchedValues,
+    },
+  }));
   return ok({ candidates });
 }

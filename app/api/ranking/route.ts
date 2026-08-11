@@ -71,7 +71,7 @@ export async function PUT(req: NextRequest) {
   const ids = parseArr(body.target_ids).slice(0, MAX_RANK);
   if (ids.length === 0) return fail("순위를 1명 이상 지정해주세요.", 400);
 
-  const valid = new Set((await recommendationsFor(user.id, user)).map((u) => u.id));
+  const valid = new Set((await recommendationsFor(user.id, user)).map((r) => r.user.id));
   for (const id of ids)
     if (!valid.has(id)) return fail("추천 리스트에 없는 대상이 포함되어 있습니다.", 400);
 

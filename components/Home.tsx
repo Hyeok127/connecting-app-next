@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
-import { Avatar, KeywordChips, ValueChips, Spinner, Empty } from "@/components/ui";
+import { Avatar, KeywordChips, MatchStrength, Spinner, Empty } from "@/components/ui";
 
 interface Candidate {
   id: string;
@@ -15,6 +15,12 @@ interface Candidate {
   mbti: string | null;
   keywords: string[];
   values?: Record<string, string>;
+  match?: {
+    strength: number;
+    score: number;
+    sharedKeywords: string[];
+    matchedValues: string[];
+  };
 }
 
 export function Home() {
@@ -106,13 +112,23 @@ export function Home() {
                       </p>
                     </div>
                   </div>
+                  {c.match && (
+                    <div className="mt-3">
+                      <MatchStrength strength={c.match.strength} />
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
                     {c.mbti && <span className="text-xs font-medium text-gold-600">{c.mbti}</span>}
-                    <KeywordChips keywords={c.keywords} />
+                    <KeywordChips keywords={c.keywords} highlight={c.match?.sharedKeywords} />
                   </div>
-                  {c.values && Object.keys(c.values).length > 0 && (
-                    <div className="mt-2">
-                      <ValueChips values={c.values} />
+                  {c.match && c.match.matchedValues.length > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1">
+                      <span className="text-xs text-ink-faint">가치관 일치</span>
+                      {c.match.matchedValues.map((v) => (
+                        <span key={v} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                          + {v} 같음
+                        </span>
+                      ))}
                     </div>
                   )}
                   <button
