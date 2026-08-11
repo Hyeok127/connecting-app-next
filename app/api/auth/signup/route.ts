@@ -8,7 +8,7 @@ import { SIGNUP_IP_MAX } from "@/lib/constants";
 import { genId, nowMs, parseArr, PHOTO_PATH_RE, genInviteCode } from "@/lib/utils";
 import { publicUserWithPhotos } from "@/lib/serialize";
 import { cleanKeywords } from "@/lib/keywords";
-import { cleanValues } from "@/lib/values";
+import { cleanValues, cleanValuePrefs } from "@/lib/values";
 import type { UserRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -110,21 +110,22 @@ export async function POST(req: NextRequest) {
     return fail(error.message, 400);
   }
 
-  // 가입 시 선호 조건 (선택, R24) — 성별/나이/직업/지역 하드 필터만. 선호 키워드는 폐지.
+  // 가입 시 선호 조건 (선택, R24) — 성별/나이/직업/지역 하드 필터 + 바라는 가치관.
   if (role === "member") {
     const genders = parseArr(body.pref_genders).filter((g) => ["남성", "여성"].includes(g));
     const jobs = parseArr(body.pref_jobs);
     const regions = parseArr(body.pref_regions);
+    const valuePrefs = cleanValuePrefs(body.value_prefs); // 바라는 가치관 → workplaces 재사용
     const ageMin = body.pref_age_min ? Number(body.pref_age_min) : null;
     const ageMax = body.pref_age_max ? Number(body.pref_age_max) : null;
-    if (genders.length || ageMin || ageMax || jobs.length || regions.length) {
+    if (genders.length || ageMin || ageMax || jobs.length || regions.length || Object.keys(valuePrefs).length) {
       await sb.from("preferences").insert({
         user_id: id,
         genders: JSON.stringify(genders),
         age_min: ageMin,
         age_max: ageMax,
         jobs: JSON.stringify(jobs),
-        workplaces: "[]", // 미사용
+        workplaces: JSON.stringify(valuePrefs), // 바라는 가치관
         regions: JSON.stringify(regions),
         mbtis: "[]",
         updated_at: nowMs(),

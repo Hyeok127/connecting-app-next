@@ -6,6 +6,7 @@ import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
+import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
 import { GuideModal } from "@/components/GuideModal";
 import type { User } from "@/lib/types";
 
@@ -79,6 +80,7 @@ export function AuthPage() {
           pref_genders: f.getAll("pref_genders"),
           pref_age_min: f.get("pref_age_min"),
           pref_age_max: f.get("pref_age_max"),
+          value_prefs: JSON.parse(String(f.get("value_prefs") || "{}")),
         });
       }
       const data = await api<{ token: string; user: User }>("/auth/signup", {
@@ -238,9 +240,9 @@ export function AuthPage() {
             />
 
             <div className="rounded-xl border border-line bg-cream/50 p-4">
-              <p className="text-sm font-medium text-ink-soft">가치관 (선택)</p>
+              <p className="text-sm font-medium text-ink-soft">나의 가치관 (선택)</p>
               <p className="mt-0.5 mb-2 text-xs text-ink-faint">
-                답한 항목이 같은 상대에게 가산점이 붙어요. 원치 않으면 비워두세요.
+                내 흡연·음주·문신·종교예요. 상대에게 보여지고, 상대의 선호와 대조돼요.
               </p>
               <ValuesSurvey />
             </div>
@@ -258,6 +260,13 @@ export function AuthPage() {
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input name="pref_age_min" type="number" placeholder="최소 나이" className={inputCls} />
                 <input name="pref_age_max" type="number" placeholder="최대 나이" className={inputCls} />
+              </div>
+              <div className="mt-3">
+                <p className="text-sm font-medium text-ink-soft">상대에게 바라는 가치관 (선택)</p>
+                <p className="mt-0.5 mb-2 text-xs text-ink-faint">
+                  허용할 값을 고르면 그런 상대가 추천 상위로 와요. 안 고르면 상관없음(내 가치관과 별개예요).
+                </p>
+                <ValuePrefSurvey />
               </div>
               <p className="mt-2 text-xs text-ink-faint">※ 비워두면 조건 제한 없이 추천돼요.</p>
             </div>

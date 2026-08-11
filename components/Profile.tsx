@@ -7,6 +7,7 @@ import { uploadPhotos } from "@/lib/upload";
 import { Avatar, Badge, KeywordChips, ValueChips, Spinner, Empty } from "@/components/ui";
 import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
+import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
 
 const inputCls =
   "mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-wine-500 focus:ring-2 focus:ring-wine-100";
@@ -26,17 +27,20 @@ export function Profile() {
   const [invite, setInvite] = useState<{ code: string; link: string } | null>(null);
   const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [stats, setStats] = useState<{ invited: number; matched: number }>({ invited: 0, matched: 0 });
+  const [valuePrefs, setValuePrefs] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [inv, invs] = await Promise.all([
+      const [inv, invs, prefs] = await Promise.all([
         api<{ code: string; link: string }>("/invite"),
         api<{ invitees: Invitee[]; stats: { invited: number; matched: number } }>("/me/invitees"),
+        api<{ valuePrefs: Record<string, string[]> }>("/me/preferences"),
       ]);
       setInvite(inv);
       setInvitees(invs.invitees);
       setStats(invs.stats);
+      setValuePrefs(prefs.valuePrefs ?? {});
     } finally {
       /* await Promise.all 이후 setState */
     }
@@ -84,7 +88,7 @@ export function Profile() {
           age_max: f.get("age_max"),
           jobs: f.get("jobs"),
           regions: f.get("regions"),
-          keywords: f.getAll("pref_kw"),
+          value_prefs: JSON.parse(String(f.get("value_prefs") || "{}")),
         }),
       });
       toast("선호 조건을 저장했어요.");
@@ -171,7 +175,7 @@ export function Profile() {
             />
           </div>
           <div className="mt-4 rounded-xl border border-line bg-cream/40 p-4">
-            <p className="mb-2 text-sm font-medium text-ink-soft">가치관 (선택)</p>
+            <p className="mb-2 text-sm font-medium text-ink-soft">나의 가치관 (선택)</p>
             <ValuesSurvey defaultValues={user.values || {}} />
           </div>
           <label className={`${labelCls} mt-3`}>
@@ -204,6 +208,11 @@ export function Profile() {
           </div>
           <input name="jobs" placeholder="직업 (콤마 구분)" className={`mt-2 ${inputCls}`} />
           <input name="regions" placeholder="사는 곳 (콤마 구분)" className={`mt-2 ${inputCls}`} />
+          <div className="mt-4">
+            <p className="text-sm font-medium text-ink-soft">상대에게 바라는 가치관</p>
+            <p className="mt-0.5 mb-2 text-xs text-ink-faint">허용할 값을 고르면 그런 상대가 추천 상위로 와요. 안 고르면 상관없음.</p>
+            <ValuePrefSurvey defaultValue={valuePrefs} />
+          </div>
           <button className="mt-5 w-full rounded-xl bg-ink py-2.5 text-sm font-semibold text-paper transition hover:bg-ink/85">
             선호 조건 저장
           </button>

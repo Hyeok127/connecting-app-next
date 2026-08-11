@@ -19,7 +19,7 @@ interface Candidate {
     strength: number;
     score: number;
     sharedKeywords: string[];
-    matchedValues: string[];
+    valueMatches: { label: string; value: string }[];
   };
 }
 
@@ -121,12 +121,12 @@ export function Home() {
                     {c.mbti && <span className="text-xs font-medium text-gold-600">{c.mbti}</span>}
                     <KeywordChips keywords={c.keywords} highlight={c.match?.sharedKeywords} />
                   </div>
-                  {c.match && c.match.matchedValues.length > 0 && (
+                  {c.match && c.match.valueMatches.length > 0 && (
                     <div className="mt-2 flex flex-wrap items-center gap-1">
-                      <span className="text-xs text-ink-faint">가치관 일치</span>
-                      {c.match.matchedValues.map((v) => (
-                        <span key={v} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          + {v} 같음
+                      <span className="text-xs text-ink-faint">내가 바라던</span>
+                      {c.match.valueMatches.map((v) => (
+                        <span key={v.label} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                          {v.label} {v.value}
                         </span>
                       ))}
                     </div>

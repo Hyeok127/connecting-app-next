@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { MAX_RANK } from "@/lib/constants";
 import type { PreferencesRow, UserRow } from "@/lib/types";
 import { parseJsonArray } from "@/lib/serialize";
-import { parseValues, valueAgreement, matchedValueLabels } from "@/lib/values";
+import { parseValues, parseValuePrefs, valuePreferenceScore, satisfiedPrefReasons } from "@/lib/values";
 import keywordVectors from "@/lib/keyword_vectors.json";
 
 // 사전계산 임베딩(정규화+centering된 단위벡터). 런타임엔 이 벡터 코사인만 쓴다(API/모델 없음).
@@ -108,7 +108,7 @@ export interface Recommendation {
   user: UserRow;
   score: number;
   sharedKeywords: string[]; // 후보 키워드 중 내 키워드와 정확/유사(코사인≥0.4) 매칭된 것
-  matchedValues: string[]; // 일치한 가치관 라벨(흡연/음주/문신/종교)
+  valueMatches: { label: string; value: string }[]; // 내 '바라는 가치관'을 충족한 상대 실제 값(예: 종교 무교)
 }
 
 export async function recommendationsFor(meId: string, me: UserRow): Promise<Recommendation[]> {
@@ -123,14 +123,18 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
   const candidates = (rows as UserRow[]) ?? [];
   const candIds = candidates.map((c) => c.id);
 
-  const [myPrefs, myMatches, myRanks, allPrefs] = await Promise.all([
-    getPrefs(meId),
+  const [myPrefRowRes, myMatches, myRanks, allPrefs] = await Promise.all([
+    sb.from("preferences").select("*").eq("user_id", meId).maybeSingle(),
     sb.from("matches").select("user_a,user_b").or(`user_a.eq.${meId},user_b.eq.${meId}`), // R7: 매칭 이력
     sb.from("rankings").select("target_id").eq("user_id", meId), // R16: 3회 이상 등재
     candIds.length
-      ? sb.from("preferences").select("*").in("user_id", candIds) // 상대 선호(상호 필터용)
+      ? sb.from("preferences").select("*").in("user_id", candIds) // 상대 선호(상호 필터·가치관선호)
       : Promise.resolve({ data: [] as PreferencesRow[] }),
   ]);
+
+  const myPrefRow = myPrefRowRes.data as PreferencesRow | null;
+  const myPrefs = myPrefRow ? rowToPrefs(myPrefRow) : null; // 하드필터(성별/나이/직업/지역/MBTI)
+  const myValuePrefs = parseValuePrefs(myPrefRow?.workplaces); // 바라는 가치관(workplaces 컬럼 재사용)
 
   const historySet = new Set<string>();
   for (const m of (myMatches.data as { user_a: string; user_b: string }[]) ?? [])
@@ -139,10 +143,14 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
   for (const r of (myRanks.data as { target_id: string }[]) ?? [])
     rankCount.set(r.target_id, (rankCount.get(r.target_id) ?? 0) + 1);
   const prefsMap = new Map<string, Prefs>();
-  for (const p of (allPrefs.data as PreferencesRow[]) ?? []) prefsMap.set(p.user_id, rowToPrefs(p));
+  const valuePrefsMap = new Map<string, Record<string, string[]>>();
+  for (const p of (allPrefs.data as PreferencesRow[]) ?? []) {
+    prefsMap.set(p.user_id, rowToPrefs(p));
+    valuePrefsMap.set(p.user_id, parseValuePrefs(p.workplaces));
+  }
 
   const myKw = parseJsonArray(me.keywords);
-  const myVals = parseValues(me.workplace); // 가치관은 users.workplace(JSON)에 저장
+  const myVals = parseValues(me.workplace); // 나의 가치관: users.workplace(JSON)
 
   const scored: (Recommendation & { sim: number })[] = [];
   for (const u of candidates) {
@@ -152,15 +160,18 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
     if (!fits(prefsMap.get(u.id) ?? null, me)) continue; // R6 (상호)
     const uKw = parseJsonArray(u.keywords);
     const uVals = parseValues(u.workplace);
-    // 취미 키워드는 유사할수록, 가치관(술/담배/문신/종교)은 같을수록 가산.
-    const sim = keywordSimilarity(myKw, uKw) + VALUE_WEIGHT * valueAgreement(myVals, uVals);
-    // 사유: 후보 키워드 중 내 키워드와 정확/유사 매칭된 것 + 일치 가치관
+    // 키워드는 유사할수록, 가치관은 "내가 바라는 조건을 상대가 충족"할수록(상호) 가산.
+    const valueBonus =
+      valuePreferenceScore(myValuePrefs, uVals) +
+      valuePreferenceScore(valuePrefsMap.get(u.id) ?? {}, myVals);
+    const sim = keywordSimilarity(myKw, uKw) + VALUE_WEIGHT * valueBonus;
     const sharedKeywords = uKw.filter((ck) => myKw.some((mk) => cosOrExact(ck, mk) > 0));
-    scored.push({ user: u, score: sim, sim, sharedKeywords, matchedValues: matchedValueLabels(myVals, uVals) });
+    // 사유: 내 바라는 가치관을 충족한 상대의 실제 값
+    scored.push({ user: u, score: sim, sim, sharedKeywords, valueMatches: satisfiedPrefReasons(myValuePrefs, uVals) });
   }
   // 유사도 우선, 동점이면 신뢰점수·가입순
   scored.sort(
     (a, b) => b.sim - a.sim || b.user.trust_score - a.user.trust_score || b.user.created_at - a.user.created_at
   );
-  return scored.slice(0, MAX_RANK).map(({ user, score, sharedKeywords, matchedValues }) => ({ user, score, sharedKeywords, matchedValues }));
+  return scored.slice(0, MAX_RANK).map(({ user, score, sharedKeywords, valueMatches }) => ({ user, score, sharedKeywords, valueMatches }));
 }

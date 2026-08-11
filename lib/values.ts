@@ -65,14 +65,48 @@ export function parseValues(s?: string | null): Record<string, string> {
   }
 }
 
-// 두 사람의 가치관 일치 개수(둘 다 응답한 항목 중 같은 답).
-export function valueAgreement(a: Record<string, string>, b: Record<string, string>): number {
+// ── 상대에게 바라는 가치관(선호) ──
+// dim → 허용하는 상대 값들의 배열. 비었거나 없으면 "상관없음". preferences.workplaces에 JSON 저장.
+export function cleanValuePrefs(v: unknown): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  if (!v || typeof v !== "object") return out;
+  for (const d of VALUE_DIMENSIONS) {
+    const arr = (v as Record<string, unknown>)[d.key];
+    if (Array.isArray(arr)) {
+      const valid = [...new Set(arr.map((x) => String(x)))].filter((x) => d.options.some((o) => o.value === x));
+      if (valid.length) out[d.key] = valid;
+    }
+  }
+  return out;
+}
+
+export function parseValuePrefs(s?: string | null): Record<string, string[]> {
+  if (!s) return {};
+  try {
+    return cleanValuePrefs(JSON.parse(s));
+  } catch {
+    return {};
+  }
+}
+
+// 내 선호(바라는 가치관)를 상대의 실제 값이 얼마나 충족하는지(항목 수).
+export function valuePreferenceScore(myPrefs: Record<string, string[]>, theirVals: Record<string, string>): number {
   let n = 0;
-  for (const key of VALUE_KEYS) if (a[key] && b[key] && a[key] === b[key]) n++;
+  for (const d of VALUE_DIMENSIONS) {
+    const acc = myPrefs[d.key];
+    const tv = theirVals[d.key];
+    if (acc && acc.length && tv && acc.includes(tv)) n++;
+  }
   return n;
 }
 
-// 일치한 가치관 항목의 라벨(예: ["음주","종교"]) — 추천 사유 표시용.
-export function matchedValueLabels(a: Record<string, string>, b: Record<string, string>): string[] {
-  return VALUE_DIMENSIONS.filter((d) => a[d.key] && b[d.key] && a[d.key] === b[d.key]).map((d) => d.label);
+// 충족된 선호 항목을 상대의 실제 값과 함께 반환(사유 표시용): [{label:"종교", value:"무교"}].
+export function satisfiedPrefReasons(myPrefs: Record<string, string[]>, theirVals: Record<string, string>): { label: string; value: string }[] {
+  const out: { label: string; value: string }[] = [];
+  for (const d of VALUE_DIMENSIONS) {
+    const acc = myPrefs[d.key];
+    const tv = theirVals[d.key];
+    if (acc && acc.length && tv && acc.includes(tv)) out.push({ label: d.label, value: tv });
+  }
+  return out;
 }

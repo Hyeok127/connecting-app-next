@@ -4,6 +4,7 @@ import { authFromToken, bearerToken } from "@/lib/auth";
 import { ok, fail, unauthorized, forbidden } from "@/lib/http";
 import { nowMs, parseArr } from "@/lib/utils";
 import { getPrefs } from "@/lib/matching";
+import { cleanValuePrefs, parseValuePrefs } from "@/lib/values";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,9 @@ export async function GET(req: NextRequest) {
   const user = await authFromToken(bearerToken(req));
   if (!user) return unauthorized();
   const prefs = await getPrefs(user.id);
-  return ok({ preferences: prefs });
+  // 바라는 가치관은 preferences.workplaces(JSON)에 저장 — 별도 필드로 내려줌
+  const { data } = await getSupabase().from("preferences").select("workplaces").eq("user_id", user.id).maybeSingle();
+  return ok({ preferences: prefs, valuePrefs: parseValuePrefs(data?.workplaces) });
 }
 
 export async function PUT(req: NextRequest) {
@@ -25,14 +28,14 @@ export async function PUT(req: NextRequest) {
   } catch {
     return fail("잘못된 요청입니다.", 400);
   }
-  // 하드 필터만 저장(성별/나이/직업/지역). 선호 키워드는 폐지 — workplaces 미사용.
+  // 하드 필터(성별/나이/직업/지역) + 바라는 가치관(workplaces 컬럼 재사용).
   const row = {
     user_id: user.id,
     genders: JSON.stringify(parseArr(body.genders).filter((g) => ["남성", "여성"].includes(g))),
     age_min: body.age_min ? Number(body.age_min) : null,
     age_max: body.age_max ? Number(body.age_max) : null,
     jobs: JSON.stringify(parseArr(body.jobs)),
-    workplaces: "[]",
+    workplaces: JSON.stringify(cleanValuePrefs(body.value_prefs)),
     regions: JSON.stringify(parseArr(body.regions)),
     mbtis: JSON.stringify(parseArr(body.mbtis)),
     updated_at: nowMs(),

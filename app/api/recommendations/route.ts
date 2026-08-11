@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       strength: Math.max(0.15, r.score / maxScore),
       score: Math.round(r.score * 10) / 10,
       sharedKeywords: r.sharedKeywords,
-      matchedValues: r.matchedValues,
+      valueMatches: r.valueMatches, // [{label:"종교", value:"무교"}] — 내 선호를 충족한 상대 실제 값
     },
   }));
   return ok({ candidates });
