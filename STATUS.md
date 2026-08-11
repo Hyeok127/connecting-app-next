@@ -1,6 +1,6 @@
 # Connecting — 작업 현황 및 남은 일
 
-> 최종 갱신: 2026-08-12 · 대상 커밋 `08b7287` (main/dev 동일)
+> 최종 갱신: 2026-08-12 01:00 · 대상 커밋 `039b86c` (main/dev 동일)
 > 이 문서는 "무엇이 끝났고, 무엇이 남았고, 무엇이 사람 손을 필요로 하는가"를 정리한다.
 > 인프라 구조·기기 역할은 [CLAUDE.md](CLAUDE.md), 배포 절차는 [README.md](README.md)가 정본.
 
@@ -11,8 +11,31 @@
 | # | 할 일 | 이유 | 방법 |
 |---|---|---|---|
 | 1 | **Supabase 액세스 토큰 교체** | 토큰이 채팅 기록에 노출됨. 이 토큰은 **모든 Supabase 프로젝트를 관리**할 수 있음(DB 삭제 포함) | [토큰 페이지](https://supabase.com/dashboard/account/tokens)에서 기존 토큰 Revoke → 새로 발급 → `.env.local`의 `SUPABASE_ACCESS_TOKEN=` 값만 교체 (채팅에 붙여넣지 말 것) |
-| 2 | **개발 서버 상주 설정** | `Linger=no`라 세션이 끝나면 3211 서버가 즉시 죽음. 지금은 접속해도 아무것도 안 뜸 | WSL에서 `sudo loginctl enable-linger jsh && systemctl --user start connecting-preview` |
-| 3 | **밤 8시 배치 첫 실행 확인** | 크론이 그동안 한 번도 실행되지 않았음(아래 참고). 수정본이 실제로 도는지 확인 필요 | 20시 이후 `curl -s https://connecting-app-next.vercel.app/api/health` → `matches_today`가 0이 아니면 정상 |
+| 2 | **밤 8시 배치 첫 실행 확인** | 크론이 그동안 한 번도 실행되지 않았음(아래 참고). 수정본이 실제로 도는지 확인 필요 | 20시 이후 `curl -s https://connecting-app-next.vercel.app/api/health` → `matches_today`가 0이 아니면 정상 |
+
+> ✅ (해결됨) 개발 서버 상주 문제 — 아래 "인프라 복구" 참고. 더 이상 손 댈 것 없음.
+
+---
+
+## 🛠 인프라 복구 (2026-08-12, 세션 말미)
+
+**증상:** 다른 세션에서 nt9 진입점이 전부 끊김 — Tailscale offline, Tailnet SSH timeout, LAN SSH/WinRM 차단.
+
+**원인:** WSL 경량 VM이 유휴 시 완전히 종료됨(`.wslconfig` 부재 → 기본 유휴 타임아웃). WSL이 꺼지면 그 안의 tailscaled·SSH·3211 서버가 전부 같이 죽는다. 다른 세션이 접속을 시도한 순간 마침 꺼져 있었던 것.
+
+**조치 (모두 완료·검증):**
+1. `C:\Users\jshye\.wslconfig` 생성 → `[wsl2] vmIdleTimeout=-1` (유휴 자동종료 비활성화)
+2. `loginctl enable-linger jsh` → `Linger=yes` (세션 끊겨도 사용자 서비스 유지). `wsl -u root`로 sudo 우회
+3. `systemctl enable tailscaled` (부팅 자동시작)
+4. `systemctl --user enable --now connecting-preview.service` (3211 서버 상주, `Restart=always`)
+5. Windows 예약 작업 `WSL-Ubuntu-AutoStart` — 로그온 시 `wsl -d Ubuntu -u root -- true`로 WSL 기동 (실행 검증: `LastTaskResult 0`)
+
+**검증:** Tailscale `Running`/`Online: True` (100.125.135.35), 3211 응답 200, SSH 22번 리슨 확인.
+
+**남은 인프라 참고:**
+- Windows **재부팅**이 아니라 **로그오프/재로그온** 시엔 예약 작업이 WSL을 깨움. 다만 로그온 후에도 실제 기동까지 수 초 걸릴 수 있음
+- LAN 주소(`192.168.45.253`)의 SSH·WinRM 차단은 **손대지 않음** — Windows 방화벽 원격관리 포트를 여는 건 보안 영향이 있는 별개 결정. Tailscale 경로로 충분
+- nt9 → 타 노드 SSH는 여전히 `Permission denied (publickey)` (nt9 발신 키 미배포)
 
 ---
 
@@ -176,8 +199,8 @@ node scripts/inspect_db.mjs .env.local.prod.bak              # RLS·인덱스·�
 - **Vercel Preview가 어느 DB를 보는지 미확인** — Preview 환경변수가 Production과 같다면 **테스트가 실사용자 데이터를 건드린다**. 확인 필요
 - **Preview는 SSO 보호됨** — Vercel 로그인 없이는 302. 폰 확인용으론 로컬 3211이 편함
 - **nt9 → 타 노드 SSH 실패** — `Permission denied (publickey)`. 6-way 메시 중 nt9 발신 경로가 끊김
-- **Windows 재부팅 시 WSL 자동 기동 없음** — 로그인 후 WSL 터미널을 한 번 열어야 함. 작업 스케줄러로 자동화 가능
 - **운영 키가 개발 기기에 존재** — `.env.local.prod.bak`에 prod service_role 키. `.env.local` 주석 토글로 dev/prod를 오가는 방식이라 실수 시 운영 데이터에 직접 접근됨
+- ~~WSL 유휴 자동종료 / 개발서버 상주 / 로그온 자동기동~~ → **해결됨** (위 "인프라 복구" 참고)
 
 ### D. 법적
 
