@@ -10,6 +10,7 @@ import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
 import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
 import { ProfileMeter } from "@/components/ProfileMeter";
+import { PushToggle } from "@/components/PushToggle";
 
 const inputCls =
   "mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-wine-500 focus:ring-2 focus:ring-wine-100";
@@ -311,6 +312,11 @@ export function Profile() {
       {/* 계정 관리 — PIN 변경 / 탈퇴 */}
       <div className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
         <h3 className="mb-3 font-display font-semibold text-ink">계정 관리</h3>
+
+        <div className="mb-5 border-b border-line pb-4">
+          <PushToggle />
+        </div>
+
         <form onSubmit={saveEmail} className="mb-5 space-y-2 border-b border-line pb-4">
           <p className="text-sm font-medium text-ink-soft">알림 이메일 <span className="text-ink-faint">(준비 중)</span></p>
           <p className="text-xs text-ink-faint">지금은 앱 안에서 새 매칭을 알려드려요. 이메일을 남겨두면 이메일 알림이 켜질 때 바로 받아볼 수 있어요.</p>

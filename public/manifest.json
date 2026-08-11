@@ -1,0 +1,13 @@
+{
+  "name": "인연 · Connecting",
+  "short_name": "인연",
+  "description": "아는 사람의 초대로 이어지는 소개팅",
+  "start_url": "/home",
+  "display": "standalone",
+  "background_color": "#f7f3ee",
+  "theme_color": "#7c2d3e",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

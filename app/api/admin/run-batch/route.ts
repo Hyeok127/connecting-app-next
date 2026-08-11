@@ -5,6 +5,7 @@ import { ok, fail, unauthorized, forbidden } from "@/lib/http";
 import { runBatch } from "@/lib/batch";
 import { cycleDate } from "@/lib/utils";
 import { notifyMatchesForCycle } from "@/lib/notify";
+import { pushMatchesForCycle } from "@/lib/push";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,8 +17,11 @@ export async function POST(req: NextRequest) {
   try {
     const result = await runBatch();
     const cycle = cycleDate();
-    // 이번 사이클에 생성된 매칭 당사자에게 "새 매칭 도착" 알림(best-effort)
-    await notifyMatchesForCycle(getSupabase(), cycle).catch(() => {});
+    // 이번 사이클에 생성된 매칭 당사자에게 "새 매칭 도착" 알림(이메일 + 웹푸시, best-effort)
+    await Promise.all([
+      notifyMatchesForCycle(getSupabase(), cycle).catch(() => {}),
+      pushMatchesForCycle(cycle).catch(() => {}),
+    ]);
     return ok({ ok: true, cycle, result });
   } catch (e) {
     return fail((e as Error).message, 400);
