@@ -41,7 +41,7 @@ export function KeywordPicker({
         <input key={k} type="hidden" name={name} value={k} />
       ))}
 
-      <div className="mt-2 max-h-64 space-y-3 overflow-y-auto rounded-xl border border-line bg-cream/40 p-3">
+      <div className="mt-2 space-y-3 rounded-xl border border-line bg-cream/40 p-3">
         {KEYWORD_CATALOG.map((cat) => (
           <div key={cat.key}>
             <p className="mb-1 text-xs font-semibold text-ink-faint">{cat.label}</p>
