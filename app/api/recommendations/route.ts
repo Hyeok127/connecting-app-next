@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
   // publicUser에 photos/contact 미포함(R5) + 추천 사유(궁합 강도·겹친 키워드·일치 가치관)
   const candidates = recs.map((r) => ({
     ...publicUser(r.user),
+    trust_score: r.user.trust_score, // R11 신뢰도 노출(coarse 배지용)
     match: {
       // 강도: 리스트 내 최고점 대비 비율(최소 0.15로 가시성 확보) → UI에서 진하기로 표현
       strength: Math.max(0.15, r.score / maxScore),

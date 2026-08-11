@@ -5,6 +5,7 @@ import { ok, fail, unauthorized, forbidden } from "@/lib/http";
 import { expireOverdue } from "@/lib/batch";
 import { genId, nowMs } from "@/lib/utils";
 import { POINTS } from "@/lib/constants";
+import { notifyUser } from "@/lib/notify";
 import type { MatchRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -81,8 +82,25 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             created_at: nowMs(),
           });
       }
+      // 쌍방 수락 알림(이메일) — 실패해도 응답엔 영향 없음(best-effort)
+      const subj = "매칭이 성사됐어요 · Connecting";
+      const bodyHtml = `<p>축하해요! 상대도 수락해 <strong>연락처가 공개</strong>됐어요.</p>
+        <p>앱에서 매칭함을 열어 연락처를 확인하고 인사를 건네보세요.</p>`;
+      await Promise.all([
+        notifyUser(match.user_a, subj, "매칭 성사 🎉", bodyHtml).catch(() => {}),
+        notifyUser(match.user_b, subj, "매칭 성사 🎉", bodyHtml).catch(() => {}),
+      ]);
       return ok({ ok: true, state: "accepted" });
     }
+    // 한쪽 수락 → 상대에게 "응답을 기다려요" 알림
+    const otherId = isA ? match.user_b : match.user_a;
+    await notifyUser(
+      otherId,
+      "새 매칭이 도착했어요 · Connecting",
+      "새 매칭 도착 💌",
+      `<p>상대가 당신과의 만남을 <strong>수락</strong>했어요. 앱에서 매칭함을 열어 응답해주세요.</p>
+       <p>응답 시간이 지나면 매칭이 자동 종료돼요.</p>`
+    ).catch(() => {});
     return ok({ ok: true, state: "pending" });
   }
 

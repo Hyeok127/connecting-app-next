@@ -4,7 +4,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { uploadPhotos } from "@/lib/upload";
-import { Avatar, Spinner, Empty } from "@/components/ui";
+import { Avatar, Spinner, Empty, TrustBadge } from "@/components/ui";
+import { ReportBlock } from "@/components/ReportBlock";
 
 interface MatchItem {
   id: string;
@@ -18,9 +19,11 @@ interface MatchItem {
   contact?: string | null;
   common_connector?: string | null;
   counterpart: {
+    id: string;
     name: string;
     age: number | null;
     job: string | null;
+    trust_score?: number;
     photos?: string[];
   };
 }
@@ -48,6 +51,7 @@ export function Matches() {
   const [fbReason, setFbReason] = useState("");
   const [fbNoShow, setFbNoShow] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [newIds, setNewIds] = useState<Set<string>>(new Set()); // 이번에 새로 등장한 매칭(순간 강조용)
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
@@ -63,6 +67,19 @@ export function Matches() {
       setMatches(m.matches);
       setMeeting(mt.meeting);
       setCloseReasons(mt.close_reasons);
+      // 이전에 본 매칭 id와 비교해 새로 생긴 것만 강조하고, 본 목록을 갱신한다.
+      if (typeof window !== "undefined") {
+        let seen: string[] = [];
+        try {
+          seen = JSON.parse(localStorage.getItem("seen_match_ids") || "[]");
+        } catch {
+          seen = [];
+        }
+        const seenSet = new Set(seen);
+        const fresh = m.matches.filter((x) => !seenSet.has(x.id)).map((x) => x.id);
+        setNewIds(new Set(fresh));
+        localStorage.setItem("seen_match_ids", JSON.stringify(m.matches.map((x) => x.id)));
+      }
     } finally {
       setLoading(false);
     }
@@ -235,13 +252,24 @@ export function Matches() {
             const left = Math.max(0, m.respond_deadline - now);
             const hours = Math.floor(left / 3600e3);
             const mins = Math.floor((left % 3600e3) / 60e3);
+            const isNew = newIds.has(m.id);
             return (
-              <div key={m.id} className="rise-in rounded-2xl border border-line bg-white p-5 shadow-sm">
+              <div
+                key={m.id}
+                className={`rise-in rounded-2xl border bg-white p-5 shadow-sm transition ${
+                  isNew ? "border-wine-300 ring-2 ring-wine-300 animate-[pulse_1.4s_ease-in-out_2]" : "border-line"
+                }`}
+              >
                 <div className="flex items-center gap-3">
                   <Avatar name={c.name} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-display font-semibold text-ink">{c.name}</span>
+                      <span className="flex items-center gap-2 font-display font-semibold text-ink">
+                        {c.name}
+                        {isNew && (
+                          <span className="rounded-full bg-wine-600 px-2 py-0.5 text-[10px] font-bold text-paper">NEW</span>
+                        )}
+                      </span>
                       {m.state === "pending" && (
                         <span className="rounded-full border border-gold-100 bg-gold-100/60 px-2.5 py-0.5 text-xs font-medium text-gold-600">
                           {m.my_response === "accept" ? "응답 완료" : "수락 대기"}
@@ -257,6 +285,11 @@ export function Matches() {
                     <p className="text-xs text-ink-faint">
                       {c.age ?? "?"}세 · {c.job ?? ""}
                     </p>
+                    {typeof c.trust_score === "number" && (
+                      <div className="mt-1">
+                        <TrustBadge score={c.trust_score} />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -350,6 +383,9 @@ export function Matches() {
                       {m.state === "rejected" ? "거절로 종료됐어요." : "응답 시간이 지나 종료됐어요."}
                     </p>
                   )}
+                </div>
+                <div className="mt-3 flex justify-end border-t border-line/60 pt-2">
+                  <ReportBlock targetId={c.id} onDone={load} />
                 </div>
               </div>
             );

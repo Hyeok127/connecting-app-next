@@ -55,9 +55,10 @@ export async function GET(req: NextRequest) {
     const myConsent = consented.has(user.id);
     const partnerConsent = consented.has(other.id);
     const exchanged = m.state === "accepted" && myConsent && partnerConsent;
-    const counterpart = exchanged
+    const counterpartBase = exchanged
       ? await publicUserWithPhotos(other)
       : publicUser(other);
+    const counterpart = { ...counterpartBase, trust_score: other.trust_score }; // R11 신뢰도
     const item: Record<string, unknown> = {
       id: m.id,
       state: m.state,

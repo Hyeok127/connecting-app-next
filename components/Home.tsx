@@ -1,9 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
-import { Avatar, KeywordChips, MatchStrength, Spinner, Empty } from "@/components/ui";
+import { Avatar, KeywordChips, MatchStrength, Empty, CardSkeletonGrid, TrustBadge } from "@/components/ui";
+import { ReportBlock } from "@/components/ReportBlock";
+import { CompletionNudge } from "@/components/ProfileMeter";
+import { GuideModal } from "@/components/GuideModal";
 
 interface Candidate {
   id: string;
@@ -15,6 +19,7 @@ interface Candidate {
   mbti: string | null;
   keywords: string[];
   values?: Record<string, string>;
+  trust_score?: number;
   match?: {
     strength: number;
     score: number;
@@ -25,11 +30,22 @@ interface Candidate {
 
 export function Home() {
   const { user } = useAuth();
+  const router = useRouter();
   const toast = useToast();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [ranking, setRanking] = useState<string[]>([]);
   const [confirmedToday, setConfirmedToday] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showGuide, setShowGuide] = useState(false);
+
+  // 온보딩: 첫 로그인 때 이용 안내를 한 번 자동으로 띄운다(localStorage 플래그).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!localStorage.getItem("onboarded_v1")) {
+      setShowGuide(true);
+      localStorage.setItem("onboarded_v1", "1");
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +79,20 @@ export function Home() {
       return next;
     });
   };
+  // 드래그 정렬(HTML5 DnD) — 드래그 중인 항목이 지나가는 위치로 실시간 재배치.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const onDragOver = (e: React.DragEvent, i: number) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === i) return;
+    setRanking((r) => {
+      const next = [...r];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(i, 0, moved);
+      return next;
+    });
+    setDragIndex(i);
+  };
+
   const confirmRank = async () => {
     try {
       await api("/ranking", { method: "PUT", body: JSON.stringify({ target_ids: ranking }) });
@@ -73,15 +103,25 @@ export function Home() {
     }
   };
 
-  if (loading) return <Spinner />;
+  if (loading)
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-8">
+        <div className="mb-1 h-6 w-32 animate-pulse rounded bg-line/70" />
+        <div className="mb-5 h-4 w-64 animate-pulse rounded bg-line/50" />
+        <CardSkeletonGrid count={4} />
+      </div>
+    );
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
+      <GuideModal open={showGuide} onClose={() => setShowGuide(false)} />
       {user?.status === "dating" && (
         <div className="mb-6 rounded-2xl border border-wine-100 bg-wine-50 p-4 text-sm text-wine-700">
           만남이 진행 중입니다. 만남이 끝나면 추천이 다시 열려요.
         </div>
       )}
+
+      {user?.status !== "dating" && <CompletionNudge user={user} onGo={() => router.push("/profile")} />}
 
       <section>
         <h2 className="mb-1 font-display text-xl font-bold tracking-tight text-ink">오늘의 추천</h2>
@@ -110,6 +150,11 @@ export function Home() {
                         {c.job && c.region ? " · " : ""}
                         {c.region ? `사는 곳: ${c.region}` : ""}
                       </p>
+                      {typeof c.trust_score === "number" && (
+                        <div className="mt-1">
+                          <TrustBadge score={c.trust_score} />
+                        </div>
+                      )}
                     </div>
                   </div>
                   {c.match && (
@@ -138,6 +183,9 @@ export function Home() {
                   >
                     {inRank ? "순위에 있음 ✓" : "순위에 추가"}
                   </button>
+                  <div className="mt-2 flex justify-end">
+                    <ReportBlock targetId={c.id} onDone={load} />
+                  </div>
                 </div>
               );
             })}
@@ -148,7 +196,7 @@ export function Home() {
       <section className="mt-12">
         <h2 className="mb-1 font-display text-xl font-bold tracking-tight text-ink">내 순위</h2>
         <p className="mb-5 text-[13px] text-ink-faint">
-          {confirmedToday ? "오늘 확정 완료 — 내일 다시 정할 수 있어요." : "순서를 정한 뒤 확정해주세요."}
+          {confirmedToday ? "오늘 확정 완료 — 내일 다시 정할 수 있어요." : "드래그하거나 ↑↓로 순서를 정한 뒤 확정해주세요."}
         </p>
         {ranking.length === 0 ? (
           <Empty>추천에서 순위에 추가할 인연을 골라보세요.</Empty>
@@ -159,10 +207,19 @@ export function Home() {
               return (
                 <div
                   key={id}
-                  className={`flex items-center gap-3 rounded-2xl border bg-white p-3.5 shadow-sm ${
+                  draggable={!confirmedToday}
+                  onDragStart={() => setDragIndex(i)}
+                  onDragOver={(e) => onDragOver(e, i)}
+                  onDragEnd={() => setDragIndex(null)}
+                  className={`flex items-center gap-3 rounded-2xl border bg-white p-3.5 shadow-sm transition ${
                     i === 0 ? "border-gold-100 ring-1 ring-gold-100" : "border-line"
-                  }`}
+                  } ${dragIndex === i ? "opacity-50 ring-2 ring-wine-300" : ""} ${!confirmedToday ? "cursor-grab active:cursor-grabbing" : ""}`}
                 >
+                  {!confirmedToday && (
+                    <span className="select-none text-ink-faint" aria-hidden title="드래그해서 순서 변경">
+                      ⠿
+                    </span>
+                  )}
                   <span className="w-7 text-center font-display text-lg font-bold text-wine-600">
                     {i + 1}
                   </span>

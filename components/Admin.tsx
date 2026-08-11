@@ -21,15 +21,29 @@ interface AdminUser {
   created_at: number;
 }
 
+interface AdminReport {
+  reporter_name: string;
+  target_id: string | null;
+  target_name: string;
+  reason: string;
+  created_at: number;
+  target_report_count: number;
+}
+
 export function Admin() {
   const toast = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [reports, setReports] = useState<AdminReport[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ users: AdminUser[] }>("/admin/users");
-      setUsers(data.users);
+      const [u, r] = await Promise.all([
+        api<{ users: AdminUser[] }>("/admin/users"),
+        api<{ reports: AdminReport[] }>("/admin/reports"),
+      ]);
+      setUsers(u.users);
+      setReports(r.reports);
     } finally {
       setLoading(false);
     }
@@ -75,6 +89,27 @@ export function Admin() {
           수동 배치 실행
         </button>
       </div>
+
+      {reports.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-red-100 bg-red-50/50 p-4">
+          <h3 className="mb-2 font-display font-semibold text-red-700">신고 접수 ({reports.length}건)</h3>
+          <div className="space-y-1.5">
+            {reports.map((r, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-soft">
+                <strong className="text-ink">{r.target_name}</strong>
+                <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700">{r.reason}</span>
+                {r.target_report_count > 1 && (
+                  <span className="rounded-full bg-red-600 px-2 py-0.5 font-medium text-white">누적 {r.target_report_count}회</span>
+                )}
+                <span className="text-ink-faint">
+                  신고자 {r.reporter_name} · {new Date(r.created_at).toLocaleDateString("ko-KR")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {users.length === 0 ? (
         <Empty>회원이 없습니다.</Empty>
       ) : (

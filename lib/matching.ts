@@ -123,13 +123,15 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
   const candidates = (rows as UserRow[]) ?? [];
   const candIds = candidates.map((c) => c.id);
 
-  const [myPrefRowRes, myMatches, myRanks, allPrefs] = await Promise.all([
+  const [myPrefRowRes, myMatches, myRanks, allPrefs, blocks] = await Promise.all([
     sb.from("preferences").select("*").eq("user_id", meId).maybeSingle(),
     sb.from("matches").select("user_a,user_b").or(`user_a.eq.${meId},user_b.eq.${meId}`), // R7: 매칭 이력
     sb.from("rankings").select("target_id").eq("user_id", meId), // R16: 3회 이상 등재
     candIds.length
       ? sb.from("preferences").select("*").in("user_id", candIds) // 상대 선호(상호 필터·가치관선호)
       : Promise.resolve({ data: [] as PreferencesRow[] }),
+    // 차단(point_events type='block'): 내가 차단했거나 나를 차단한 관계 전부 제외
+    sb.from("point_events").select("user_id,related_match_id").eq("type", "block").or(`user_id.eq.${meId},related_match_id.eq.${meId}`),
   ]);
 
   const myPrefRow = myPrefRowRes.data as PreferencesRow | null;
@@ -139,6 +141,9 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
   const historySet = new Set<string>();
   for (const m of (myMatches.data as { user_a: string; user_b: string }[]) ?? [])
     historySet.add(m.user_a === meId ? m.user_b : m.user_a);
+  // 차단 관계는 양방향으로 제외
+  for (const b of (blocks.data as { user_id: string; related_match_id: string }[]) ?? [])
+    historySet.add(b.user_id === meId ? b.related_match_id : b.user_id);
   const rankCount = new Map<string, number>();
   for (const r of (myRanks.data as { target_id: string }[]) ?? [])
     rankCount.set(r.target_id, (rankCount.get(r.target_id) ?? 0) + 1);

@@ -1,24 +1,31 @@
 "use client";
 import { useState } from "react";
 
-// 매칭 방식·이용법 안내 모달. 로그인/가입 화면 하단 링크로 진입.
-export function GuideModal() {
-  const [open, setOpen] = useState(false);
+// 매칭 방식·이용법 안내 모달.
+//  - 기본: 자체 트리거 버튼 + 내부 상태(로그인/가입 화면 하단 링크).
+//  - 제어형: open/onClose를 넘기면 트리거 없이 외부 상태로 열고 닫음(첫 로그인 온보딩용).
+export function GuideModal({ open: openProp, onClose }: { open?: boolean; onClose?: () => void } = {}) {
+  const controlled = openProp !== undefined;
+  const [openState, setOpenState] = useState(false);
+  const open = controlled ? openProp : openState;
+  const close = () => (controlled ? onClose?.() : setOpenState(false));
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="mx-auto mt-6 block text-sm font-medium text-wine-700 underline-offset-4 hover:underline"
-      >
-        인연은 어떻게 매칭하나요? · 이용 안내 보기
-      </button>
+      {!controlled && (
+        <button
+          type="button"
+          onClick={() => setOpenState(true)}
+          className="mx-auto mt-6 block text-sm font-medium text-wine-700 underline-offset-4 hover:underline"
+        >
+          인연은 어떻게 매칭하나요? · 이용 안내 보기
+        </button>
+      )}
 
       {open && (
         <div
           className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/60 p-4"
-          onClick={() => setOpen(false)}
+          onClick={() => close()}
         >
           <div
             className="my-8 h-fit w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-2xl"
@@ -31,7 +38,7 @@ export function GuideModal() {
               </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => close()}
                 className="rounded-full border border-line px-3 py-1 text-sm text-ink-soft hover:bg-cream"
               >
                 닫기
@@ -106,7 +113,7 @@ export function GuideModal() {
 
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => close()}
               className="mt-5 w-full rounded-xl bg-wine-600 py-2.5 text-sm font-semibold text-paper transition hover:bg-wine-700"
             >
               이해했어요

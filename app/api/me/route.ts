@@ -90,3 +90,37 @@ export async function PUT(req: NextRequest) {
   (me as unknown as Record<string, unknown>).contact = updated!.contact;
   return ok({ user: me });
 }
+
+// 회원 탈퇴: 진행 중 매칭(dating)이면 막고, 아니면 본인 데이터 전부 삭제.
+export async function DELETE(req: NextRequest) {
+  const user = await authFromToken(bearerToken(req));
+  if (!user) return unauthorized();
+  const sb = getSupabase();
+  if (user.status === "dating")
+    return fail("진행 중인 만남이 있어 탈퇴할 수 없어요. 만남을 종료한 뒤 다시 시도해주세요.", 409);
+
+  const id = user.id;
+  // 내 사진 정리
+  const myPhotos = parseJsonArray(user.photos);
+  if (myPhotos.length) await sb.storage.from(PHOTO_BUCKET).remove(myPhotos).catch(() => {});
+
+  // 나와 관련된 매칭/만남/피드백 정리(FK 안전 순서)
+  const { data: myMatches } = await sb.from("matches").select("id").or(`user_a.eq.${id},user_b.eq.${id}`);
+  const matchIds = (myMatches ?? []).map((m) => m.id);
+  if (matchIds.length) {
+    const { data: mtgs } = await sb.from("meetings").select("id").in("match_id", matchIds);
+    const meetingIds = (mtgs ?? []).map((x) => x.id);
+    if (meetingIds.length) await sb.from("feedbacks").delete().in("meeting_id", meetingIds);
+    await sb.from("meetings").delete().in("match_id", matchIds);
+    await sb.from("matches").delete().in("id", matchIds);
+  }
+  await sb.from("feedbacks").delete().eq("from_user", id);
+  await sb.from("point_events").delete().eq("user_id", id);
+  await sb.from("sessions").delete().eq("user_id", id);
+  await sb.from("preferences").delete().eq("user_id", id);
+  await sb.from("rankings").delete().or(`user_id.eq.${id},target_id.eq.${id}`);
+  await sb.from("users").update({ invited_by: null }).eq("invited_by", id); // 나를 초대한 참조 해제
+  const { error } = await sb.from("users").delete().eq("id", id);
+  if (error) return fail(error.message, 400);
+  return ok({ ok: true });
+}

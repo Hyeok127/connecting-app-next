@@ -101,10 +101,65 @@ export function ValueChips({ values }: { values?: Record<string, string> }) {
   );
 }
 
+// 신뢰도 배지 — 기본 50점. 약속 이행(+5)/노쇼(-50)로 변동.
+//   ≥60 좋음 / 40~59 보통 / <40 주의. 정확한 숫자 대신 coarse 라벨로 노출.
+export function TrustBadge({ score, showScore = false }: { score: number; showScore?: boolean }) {
+  const level = score >= 60 ? "good" : score >= 40 ? "ok" : "low";
+  const cfg = {
+    good: { label: "신뢰도 좋음", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    ok: { label: "신뢰도 보통", cls: "bg-cream text-ink-soft border-line" },
+    low: { label: "주의 필요", cls: "bg-red-50 text-red-700 border-red-200" },
+  }[level];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${cfg.cls}`}>
+      <span aria-hidden>🛡️</span>
+      {cfg.label}
+      {showScore && <span className="opacity-70">· {score}점</span>}
+    </span>
+  );
+}
+
 export function Spinner() {
   return (
     <div className="flex justify-center py-16">
       <div className="h-8 w-8 animate-spin rounded-full border-4 border-wine-100 border-t-wine-600" />
+    </div>
+  );
+}
+
+// 로딩 자리표시(스켈레톤). 회색 블록이 은은하게 깜빡임(animate-pulse).
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-line/70 ${className}`} />;
+}
+
+// 추천/매칭 카드 로딩용 스켈레톤 카드.
+export function CardSkeleton() {
+  return (
+    <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-11 w-11 rounded-full" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-4 w-2/5" />
+          <Skeleton className="h-3 w-3/5" />
+        </div>
+      </div>
+      <Skeleton className="mt-4 h-2 w-full" />
+      <div className="mt-3 flex gap-1.5">
+        <Skeleton className="h-5 w-14 rounded-full" />
+        <Skeleton className="h-5 w-16 rounded-full" />
+        <Skeleton className="h-5 w-12 rounded-full" />
+      </div>
+      <Skeleton className="mt-4 h-9 w-full rounded-xl" />
+    </div>
+  );
+}
+
+export function CardSkeletonGrid({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {Array.from({ length: count }).map((_, i) => (
+        <CardSkeleton key={i} />
+      ))}
     </div>
   );
 }

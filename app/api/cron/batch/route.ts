@@ -1,7 +1,9 @@
 import type { NextRequest } from "next/server";
+import { getSupabase } from "@/lib/supabase";
 import { ok, fail } from "@/lib/http";
 import { runBatch } from "@/lib/batch";
 import { cycleDate } from "@/lib/utils";
+import { notifyMatchesForCycle } from "@/lib/notify";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,7 +22,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await runBatch();
-    return ok({ ok: true, cycle: cycleDate(), result });
+    const cycle = cycleDate();
+    await notifyMatchesForCycle(getSupabase(), cycle).catch(() => {}); // 새 매칭 이메일 알림(best-effort)
+    return ok({ ok: true, cycle, result });
   } catch (e) {
     return fail((e as Error).message, 400);
   }

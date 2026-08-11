@@ -1,13 +1,15 @@
 "use client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { uploadPhotos } from "@/lib/upload";
-import { Avatar, Badge, KeywordChips, ValueChips, Spinner, Empty } from "@/components/ui";
+import { Avatar, Badge, KeywordChips, ValueChips, Spinner, Empty, TrustBadge } from "@/components/ui";
 import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
 import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
+import { ProfileMeter } from "@/components/ProfileMeter";
 
 const inputCls =
   "mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-wine-500 focus:ring-2 focus:ring-wine-100";
@@ -22,25 +24,33 @@ interface Invitee {
 }
 
 export function Profile() {
-  const { user, refresh } = useAuth();
+  const { user, refresh, logout } = useAuth();
+  const router = useRouter();
   const toast = useToast();
   const [invite, setInvite] = useState<{ code: string; link: string } | null>(null);
   const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [stats, setStats] = useState<{ invited: number; matched: number }>({ invited: 0, matched: 0 });
   const [valuePrefs, setValuePrefs] = useState<Record<string, string[]>>({});
+  const [pinBusy, setPinBusy] = useState(false);
+  const [delBusy, setDelBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [inv, invs, prefs] = await Promise.all([
+      const [inv, invs, prefs, em] = await Promise.all([
         api<{ code: string; link: string }>("/invite"),
         api<{ invitees: Invitee[]; stats: { invited: number; matched: number } }>("/me/invitees"),
         api<{ valuePrefs: Record<string, string[]> }>("/me/preferences"),
+        api<{ email: string | null }>("/me/email"),
       ]);
       setInvite(inv);
       setInvitees(invs.invitees);
       setStats(invs.stats);
       setValuePrefs(prefs.valuePrefs ?? {});
+      setEmail(em.email ?? "");
     } finally {
       /* await Promise.all 이후 setState */
     }
@@ -98,6 +108,48 @@ export function Profile() {
     }
   };
 
+  const changePin = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setPinBusy(true);
+    try {
+      await api("/me/pin", { method: "POST", body: JSON.stringify({ current_pin: f.get("current_pin"), new_pin: f.get("new_pin") }) });
+      toast("PIN을 변경했어요.");
+      (e.target as HTMLFormElement).reset();
+    } catch (err) {
+      toast((err as Error).message);
+    } finally {
+      setPinBusy(false);
+    }
+  };
+
+  const saveEmail = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setEmailBusy(true);
+    try {
+      const r = await api<{ email: string | null }>("/me/email", { method: "POST", body: JSON.stringify({ email }) });
+      setEmail(r.email ?? "");
+      toast(r.email ? "알림 이메일을 저장했어요." : "알림 이메일을 해제했어요.");
+    } catch (err) {
+      toast((err as Error).message);
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    setDelBusy(true);
+    try {
+      await api("/me", { method: "DELETE" });
+      toast("탈퇴가 완료됐어요.");
+      await logout();
+      router.push("/");
+    } catch (err) {
+      toast((err as Error).message);
+      setDelBusy(false);
+    }
+  };
+
   const copy = async () => {
     if (!invite) return;
     try {
@@ -117,9 +169,10 @@ export function Profile() {
         <div className="flex items-center gap-4">
           <Avatar name={user.name} size="lg" />
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-display text-lg font-bold text-ink">{user.name}</span>
               <Badge status={user.status} />
+              {isMember && <TrustBadge score={user.trust_score} showScore />}
             </div>
             <p className="text-sm text-ink-faint">
               {isMember ? "일반 회원" : "주선자"} · 포인트 {user.points}점
@@ -152,6 +205,12 @@ export function Profile() {
           </div>
         )}
       </div>
+
+      {isMember && (
+        <div className="mt-6">
+          <ProfileMeter user={user} email={email} hasValuePrefs={Object.values(valuePrefs).some((a) => a.length > 0)} />
+        </div>
+      )}
 
       {isMember && (
         <form onSubmit={saveProfile} className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
@@ -247,6 +306,54 @@ export function Profile() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* 계정 관리 — PIN 변경 / 탈퇴 */}
+      <div className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
+        <h3 className="mb-3 font-display font-semibold text-ink">계정 관리</h3>
+        <form onSubmit={saveEmail} className="mb-5 space-y-2 border-b border-line pb-4">
+          <p className="text-sm font-medium text-ink-soft">알림 이메일</p>
+          <p className="text-xs text-ink-faint">새 매칭·매칭 성사 소식을 이메일로 받아요. 비우면 알림을 끕니다.</p>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            placeholder="you@example.com"
+            className={inputCls}
+            autoComplete="email"
+          />
+          <button disabled={emailBusy} className="w-full rounded-xl bg-ink py-2 text-sm font-semibold text-paper transition hover:bg-ink/85 disabled:opacity-40">
+            {emailBusy ? "저장 중..." : "이메일 저장"}
+          </button>
+        </form>
+
+        <form onSubmit={changePin} className="space-y-2">
+          <p className="text-sm font-medium text-ink-soft">PIN 변경</p>
+          <input name="current_pin" type="password" inputMode="numeric" maxLength={6} placeholder="현재 PIN" className={inputCls} autoComplete="current-password" />
+          <input name="new_pin" type="password" inputMode="numeric" maxLength={6} placeholder="새 PIN (숫자 6자리)" className={inputCls} autoComplete="new-password" />
+          <button disabled={pinBusy} className="w-full rounded-xl bg-ink py-2 text-sm font-semibold text-paper transition hover:bg-ink/85 disabled:opacity-40">
+            {pinBusy ? "변경 중..." : "PIN 변경"}
+          </button>
+        </form>
+
+        <div className="mt-5 border-t border-line pt-4">
+          <p className="text-sm font-medium text-wine-700">회원 탈퇴</p>
+          <p className="mt-0.5 text-xs text-ink-faint">모든 정보가 삭제되며 되돌릴 수 없어요.</p>
+          {confirmDelete ? (
+            <div className="mt-2 flex gap-2">
+              <button onClick={deleteAccount} disabled={delBusy} className="flex-1 rounded-xl bg-wine-600 py-2 text-sm font-semibold text-paper transition hover:bg-wine-700 disabled:opacity-40">
+                {delBusy ? "탈퇴 중..." : "정말 탈퇴할게요"}
+              </button>
+              <button onClick={() => setConfirmDelete(false)} className="rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink-soft">
+                취소
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)} className="mt-2 rounded-xl border border-wine-200 bg-wine-50 px-4 py-2 text-sm font-medium text-wine-700">
+              탈퇴하기
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
