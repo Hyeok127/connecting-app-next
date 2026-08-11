@@ -130,20 +130,20 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
     candIds.length
       ? sb.from("preferences").select("*").in("user_id", candIds) // 상대 선호(상호 필터·가치관선호)
       : Promise.resolve({ data: [] as PreferencesRow[] }),
-    // 차단(point_events type='block'): 내가 차단했거나 나를 차단한 관계 전부 제외
-    sb.from("point_events").select("user_id,related_match_id").eq("type", "block").or(`user_id.eq.${meId},related_match_id.eq.${meId}`),
+    // 차단: 내가 차단했거나 나를 차단한 관계 전부 제외
+    sb.from("blocks").select("user_id,target_id").or(`user_id.eq.${meId},target_id.eq.${meId}`),
   ]);
 
   const myPrefRow = myPrefRowRes.data as PreferencesRow | null;
   const myPrefs = myPrefRow ? rowToPrefs(myPrefRow) : null; // 하드필터(성별/나이/직업/지역/MBTI)
-  const myValuePrefs = parseValuePrefs(myPrefRow?.workplaces); // 바라는 가치관(workplaces 컬럼 재사용)
+  const myValuePrefs = parseValuePrefs(myPrefRow?.value_prefs ?? myPrefRow?.workplaces); // 바라는 가치관
 
   const historySet = new Set<string>();
   for (const m of (myMatches.data as { user_a: string; user_b: string }[]) ?? [])
     historySet.add(m.user_a === meId ? m.user_b : m.user_a);
   // 차단 관계는 양방향으로 제외
-  for (const b of (blocks.data as { user_id: string; related_match_id: string }[]) ?? [])
-    historySet.add(b.user_id === meId ? b.related_match_id : b.user_id);
+  for (const b of (blocks.data as { user_id: string; target_id: string }[]) ?? [])
+    historySet.add(b.user_id === meId ? b.target_id : b.user_id);
   const rankCount = new Map<string, number>();
   for (const r of (myRanks.data as { target_id: string }[]) ?? [])
     rankCount.set(r.target_id, (rankCount.get(r.target_id) ?? 0) + 1);
@@ -151,11 +151,11 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
   const valuePrefsMap = new Map<string, Record<string, string[]>>();
   for (const p of (allPrefs.data as PreferencesRow[]) ?? []) {
     prefsMap.set(p.user_id, rowToPrefs(p));
-    valuePrefsMap.set(p.user_id, parseValuePrefs(p.workplaces));
+    valuePrefsMap.set(p.user_id, parseValuePrefs(p.value_prefs ?? p.workplaces));
   }
 
   const myKw = parseJsonArray(me.keywords);
-  const myVals = parseValues(me.workplace); // 나의 가치관: users.workplace(JSON)
+  const myVals = parseValues(me.life_values ?? me.workplace); // 나의 가치관
 
   const scored: (Recommendation & { sim: number })[] = [];
   for (const u of candidates) {
@@ -164,7 +164,7 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
     if (!fits(myPrefs, u)) continue; // R6
     if (!fits(prefsMap.get(u.id) ?? null, me)) continue; // R6 (상호)
     const uKw = parseJsonArray(u.keywords);
-    const uVals = parseValues(u.workplace);
+    const uVals = parseValues(u.life_values ?? u.workplace);
     // 키워드는 유사할수록, 가치관은 "내가 바라는 조건을 상대가 충족"할수록(상호) 가산.
     const valueBonus =
       valuePreferenceScore(myValuePrefs, uVals) +

@@ -3,14 +3,14 @@ import { getSupabase } from "@/lib/supabase";
 import { authFromToken, bearerToken } from "@/lib/auth";
 import { ok, fail, unauthorized, forbidden } from "@/lib/http";
 import { parseJsonArray } from "@/lib/serialize";
-import { genId, nowMs } from "@/lib/utils";
+import { nowMs } from "@/lib/utils";
 import type { MatchRow } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 // 매칭 성사 후 사진 교환 동의. 양측이 모두 동의해야 서로의 사진이 공개된다.
-// 동의는 스키마 변경 없이 point_events(type='photo_consent', points=0)에 기록한다.
+// 동의는 photo_consents 테이블에 (match_id, user_id) 한 행으로 기록한다.
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const user = await authFromToken(bearerToken(req));
   if (!user) return unauthorized();
@@ -29,35 +29,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (parseJsonArray(user.photos).length === 0)
     return fail("먼저 프로필에서 사진을 등록해주세요.", 400);
 
-  // 내 동의 이벤트가 없으면 1회만 기록 (멱등)
-  const { data: mine } = await sb
-    .from("point_events")
-    .select("id")
-    .eq("type", "photo_consent")
-    .eq("related_match_id", match.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!mine) {
-    await sb.from("point_events").insert({
-      id: genId(),
-      user_id: user.id,
-      type: "photo_consent",
-      points: 0,
-      related_match_id: match.id,
-      created_at: nowMs(),
-    });
-  }
+  // 내 동의 기록 (PK가 (match_id,user_id)라 중복 삽입은 DB가 막는다 — 멱등)
+  const { error } = await sb
+    .from("photo_consents")
+    .insert({ match_id: match.id, user_id: user.id, created_at: nowMs() });
+  if (error && error.code !== "23505") return fail(error.message, 400);
 
   // 상대의 동의 여부 확인 → 둘 다면 교환 성립
   const otherId = match.user_a === user.id ? match.user_b : match.user_a;
   const { data: partner } = await sb
-    .from("point_events")
-    .select("id")
-    .eq("type", "photo_consent")
-    .eq("related_match_id", match.id)
+    .from("photo_consents")
+    .select("user_id")
+    .eq("match_id", match.id)
     .eq("user_id", otherId)
     .maybeSingle();
 
-  // (getUserById 불필요하지만 상대 존재 확인용은 생략 — 매칭이 이미 상대를 보증)
   return ok({ ok: true, photos_exchanged: !!partner });
 }

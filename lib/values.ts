@@ -1,5 +1,5 @@
 // lib/values.ts — 가치관/라이프스타일 설문(차이가 크게 작용하는 차원).
-// 각 항목은 선택(무응답 허용). 저장은 DDL 없이 users.workplace(근무지 폐지로 빈 컬럼)에
+// 각 항목은 선택(무응답 허용). 저장은 users.life_values(jsonb)에
 // JSON으로 기록한다. 매칭에서는 "같은 답이면 가산점"(취미 키워드는 유사도, 가치관은 일치).
 
 // value: 저장·매칭에 쓰는 짧은 값. label: 선택 화면에 보이는 기준 포함 문구.
@@ -55,9 +55,10 @@ export function cleanValues(v: unknown): Record<string, string> {
   return out;
 }
 
-// 저장 문자열(JSON) → 객체
-export function parseValues(s?: string | null): Record<string, string> {
+// 저장값 → 객체. users.life_values(jsonb 객체)와 레거시 JSON 문자열을 모두 받는다.
+export function parseValues(s?: string | Record<string, unknown> | null): Record<string, string> {
   if (!s) return {};
+  if (typeof s === "object") return cleanValues(s);
   try {
     return cleanValues(JSON.parse(s));
   } catch {
@@ -66,7 +67,7 @@ export function parseValues(s?: string | null): Record<string, string> {
 }
 
 // ── 상대에게 바라는 가치관(선호) ──
-// dim → 허용하는 상대 값들의 배열. 비었거나 없으면 "상관없음". preferences.workplaces에 JSON 저장.
+// dim → 허용하는 상대 값들의 배열. 비었거나 없으면 "상관없음". preferences.value_prefs(jsonb).
 export function cleanValuePrefs(v: unknown): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   if (!v || typeof v !== "object") return out;
@@ -80,8 +81,10 @@ export function cleanValuePrefs(v: unknown): Record<string, string[]> {
   return out;
 }
 
-export function parseValuePrefs(s?: string | null): Record<string, string[]> {
+// preferences.value_prefs(jsonb) 및 레거시 JSON 문자열 모두 허용.
+export function parseValuePrefs(s?: string | Record<string, unknown> | null): Record<string, string[]> {
   if (!s) return {};
+  if (typeof s === "object") return cleanValuePrefs(s);
   try {
     return cleanValuePrefs(JSON.parse(s));
   } catch {

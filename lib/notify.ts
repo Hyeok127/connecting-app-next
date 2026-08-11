@@ -1,8 +1,6 @@
-// lib/notify.ts — 이메일 알림(스키마 변경 없이 point_events에 주소 저장, Resend로 발송).
-//   저장: point_events type='email|<주소>', points=0, user_id=본인.  (사용자당 최신 1건만 유지)
+// lib/notify.ts — 이메일 알림. 주소는 users.email 컬럼에 저장하고 Resend로 발송한다.
 //   발송: RESEND_API_KEY 환경변수가 있으면 Resend API로, 없으면 no-op(로그만).
 import { getSupabase } from "@/lib/supabase";
-import { genId, nowMs } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -12,47 +10,26 @@ export function isValidEmail(s: string): boolean {
 
 // 사용자 알림 이메일 조회(없으면 null)
 export async function getEmail(userId: string): Promise<string | null> {
-  const { data } = await getSupabase()
-    .from("point_events")
-    .select("type")
-    .eq("user_id", userId)
-    .like("type", "email|%")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!data) return null;
-  return String(data.type).slice("email|".length) || null;
+  const { data } = await getSupabase().from("users").select("email").eq("id", userId).maybeSingle();
+  return data?.email ?? null;
 }
 
 // 여러 사용자 이메일 일괄 조회
 export async function getEmails(userIds: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (!userIds.length) return out;
-  const { data } = await getSupabase()
-    .from("point_events")
-    .select("user_id, type, created_at")
-    .in("user_id", userIds)
-    .like("type", "email|%")
-    .order("created_at", { ascending: false });
-  for (const e of data ?? []) {
-    if (!out.has(e.user_id)) out.set(e.user_id, String(e.type).slice("email|".length));
-  }
+  const { data } = await getSupabase().from("users").select("id, email").in("id", userIds);
+  for (const u of data ?? []) if (u.email) out.set(u.id, u.email);
   return out;
 }
 
-// 알림 이메일 설정(기존 값 교체). 빈 문자열이면 해제.
+// 알림 이메일 설정(빈 문자열이면 해제).
 export async function setEmail(userId: string, email: string): Promise<void> {
-  const sb = getSupabase();
-  await sb.from("point_events").delete().eq("user_id", userId).like("type", "email|%");
   const clean = email.trim();
-  if (!clean) return;
-  await sb.from("point_events").insert({
-    id: genId(),
-    user_id: userId,
-    type: `email|${clean}`,
-    points: 0,
-    created_at: nowMs(),
-  });
+  await getSupabase()
+    .from("users")
+    .update({ email: clean || null })
+    .eq("id", userId);
 }
 
 // 실제 발송(Resend). 키 없으면 조용히 스킵(개발/미설정 환경).

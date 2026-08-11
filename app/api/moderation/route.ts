@@ -7,15 +7,13 @@ import { clientIp, ipAllowed } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
-// 차단/신고는 스키마 변경 없이 point_events에 이벤트로 기록(points=0).
-//   차단:  type='block',  related_match_id=상대id
-//   신고:  type='report|<사유>', related_match_id=상대id
+// 차단/신고. 각각 blocks / reports 테이블에 기록한다(005 이전에는 point_events 인코딩).
 const REPORT_REASONS = ["부적절한 프로필", "부적절한 사진", "불쾌한 대화", "사칭 의심", "기타"];
 
 export async function POST(req: NextRequest) {
   const user = await authFromToken(bearerToken(req));
   if (!user) return unauthorized();
-  // 신고/차단 행 무제한 삽입 방지(point_events는 추천·관리자 화면이 스캔하는 테이블)
+  // 신고/차단 행 무제한 삽입 방지
   if (!(await ipAllowed("moderation", clientIp(req), 30)))
     return fail("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", 429);
 
@@ -31,31 +29,35 @@ export async function POST(req: NextRequest) {
 
   const sb = getSupabase();
 
-  if (kind === "block" || kind === "unblock") {
-    if (kind === "unblock") {
-      await sb.from("point_events").delete().eq("user_id", user.id).eq("type", "block").eq("related_match_id", targetId);
-      return ok({ ok: true, blocked: false });
-    }
-    const { data: exists } = await sb
-      .from("point_events")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("type", "block")
-      .eq("related_match_id", targetId)
-      .maybeSingle();
-    if (!exists) {
-      await sb.from("point_events").insert({ id: genId(), user_id: user.id, type: "block", points: 0, related_match_id: targetId, created_at: nowMs() });
-    }
-    return ok({ ok: true, blocked: true });
+  // 차단은 (user_id, target_id) 유니크라 중복 삽입을 DB가 막아준다.
+  const block = async () => {
+    const { error } = await sb
+      .from("blocks")
+      .insert({ id: genId(), user_id: user.id, target_id: targetId, created_at: nowMs() });
+    if (error && error.code !== "23505") throw new Error(error.message); // 23505=이미 차단됨
+  };
+
+  if (kind === "unblock") {
+    await sb.from("blocks").delete().eq("user_id", user.id).eq("target_id", targetId);
+    return ok({ ok: true, blocked: false });
   }
 
-  if (kind === "report") {
-    const reason = REPORT_REASONS.includes(String(body.reason)) ? String(body.reason) : "기타";
-    await sb.from("point_events").insert({ id: genId(), user_id: user.id, type: `report|${reason}`, points: 0, related_match_id: targetId, created_at: nowMs() });
-    // 신고와 동시에 차단도 걸어 추천에서 빠지게 함
-    const { data: exists } = await sb.from("point_events").select("id").eq("user_id", user.id).eq("type", "block").eq("related_match_id", targetId).maybeSingle();
-    if (!exists) await sb.from("point_events").insert({ id: genId(), user_id: user.id, type: "block", points: 0, related_match_id: targetId, created_at: nowMs() });
-    return ok({ ok: true });
+  try {
+    if (kind === "block") {
+      await block();
+      return ok({ ok: true, blocked: true });
+    }
+    if (kind === "report") {
+      const reason = REPORT_REASONS.includes(String(body.reason)) ? String(body.reason) : "기타";
+      const { error } = await sb
+        .from("reports")
+        .insert({ id: genId(), reporter_id: user.id, target_id: targetId, reason, created_at: nowMs() });
+      if (error) return fail(error.message, 400);
+      await block(); // 신고와 동시에 차단해 추천에서 빠지게 함
+      return ok({ ok: true });
+    }
+  } catch (e) {
+    return fail((e as Error).message, 400);
   }
 
   return fail("알 수 없는 요청입니다.", 400);

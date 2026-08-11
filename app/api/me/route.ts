@@ -52,10 +52,10 @@ export async function PUT(req: NextRequest) {
     for (const f of ["job", "region", "contact"] as const) {
       if (body[f] !== undefined) sets[f] = String(body[f]).trim() || null;
     }
-    // 가치관 설문은 workplace 컬럼에 JSON으로 저장(근무지 자유입력 폐지).
+    // 가치관 설문 — users.life_values(jsonb)
     if (body.values !== undefined) {
       const vals = cleanValues(body.values);
-      sets.workplace = Object.keys(vals).length ? JSON.stringify(vals) : null;
+      sets.life_values = Object.keys(vals).length ? vals : null;
     }
     if (body.keywords !== undefined) {
       const kw = cleanKeywords(parseArr(body.keywords));
@@ -137,6 +137,8 @@ export async function DELETE(req: NextRequest) {
   await sb.from("sessions").delete().eq("user_id", id);
   await sb.from("preferences").delete().eq("user_id", id);
   await sb.from("rankings").delete().or(`user_id.eq.${id},target_id.eq.${id}`);
+  // blocks/reports/photo_consents/push_subscriptions는 users FK가 on delete cascade라
+  // 아래 users 삭제로 함께 지워진다(양방향 모두).
   await sb.from("users").update({ invited_by: null }).eq("invited_by", id); // 나를 초대한 참조 해제
   const { error } = await sb.from("users").delete().eq("id", id);
   if (error) return fail(error.message, 400);

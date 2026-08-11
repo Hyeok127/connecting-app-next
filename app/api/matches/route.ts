@@ -26,22 +26,16 @@ export async function GET(req: NextRequest) {
 
   const matchRows = (rows as MatchRow[]) ?? [];
 
-  // 사진 교환 동의는 스키마 변경(DDL) 없이 point_events에 이벤트로 기록한다.
-  // type='photo_consent', related_match_id=매칭, user_id=동의자. 매칭당 양측 이벤트가
-  // 모두 있으면 교환 성립. (기존 포인트 합산엔 points=0이라 영향 없음)
+  // 사진 교환 동의: photo_consents에 (match_id, user_id) 한 행. 매칭당 양측 행이
+  // 모두 있으면 교환 성립.
   const consentByMatch = new Map<string, Set<string>>();
   const ids = matchRows.map((m) => m.id);
   if (ids.length) {
-    const { data: ev } = await sb
-      .from("point_events")
-      .select("user_id, related_match_id")
-      .eq("type", "photo_consent")
-      .in("related_match_id", ids);
+    const { data: ev } = await sb.from("photo_consents").select("user_id, match_id").in("match_id", ids);
     for (const e of ev ?? []) {
-      if (!e.related_match_id) continue;
-      const s = consentByMatch.get(e.related_match_id) ?? new Set<string>();
+      const s = consentByMatch.get(e.match_id) ?? new Set<string>();
       s.add(e.user_id);
-      consentByMatch.set(e.related_match_id, s);
+      consentByMatch.set(e.match_id, s);
     }
   }
 

@@ -1,7 +1,7 @@
-// lib/push.ts — 웹푸시(브라우저 알림). 스키마 변경 없이 point_events에 저장:
-//   VAPID 키:   type='vapid_keys',  related_match_id=JSON({publicKey,privateKey})  (루트 관리자 소유, 전역 1쌍)
-//   구독:        type='push_sub',    related_match_id=JSON(PushSubscription)          (사용자·기기별 N개)
-// VAPID 키는 최초 사용 시 자동 생성돼 DB에 저장된다(환경변수·외부가입 불필요).
+// lib/push.ts — 웹푸시(브라우저 알림).
+//   VAPID 키: app_config('vapid_keys')에 전역 1쌍. 최초 사용 시 자동 생성돼 저장된다
+//             (환경변수·외부 가입 불필요).
+//   구독:      push_subscriptions 테이블에 사용자·기기별 N개(endpoint 유니크).
 import webpush from "web-push";
 import { getSupabase } from "@/lib/supabase";
 import { genId, nowMs } from "@/lib/utils";
@@ -19,68 +19,33 @@ interface Vapid {
 // VAPID subject(푸시 서비스 운영자용 연락처) — 형식만 유효하면 됨.
 const VAPID_SUBJECT = "mailto:noreply@connecting.app";
 
-// VAPID 키 소유자(삭제되지 않는 안정적 계정) = 최초 루트 관리자.
-async function rootOwnerId(): Promise<string | null> {
-  const sb = getSupabase();
-  const { data: admin } = await sb
-    .from("users")
-    .select("id")
-    .eq("is_admin", 1)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (admin?.id) return admin.id;
-  // 폴백: 가장 먼저 가입한 사용자
-  const { data: any } = await sb.from("users").select("id").order("created_at", { ascending: true }).limit(1).maybeSingle();
-  return any?.id ?? null;
-}
-
 let cachedVapid: Vapid | null = null;
 
-// 전역 VAPID 키 조회(없으면 생성·저장). 항상 '가장 먼저 만들어진' 행을 읽어 공개/개인 키가 한 쌍으로 일치.
+// 전역 VAPID 키 조회(없으면 생성·저장). app_config의 PK(key)가 유니크라
+// 동시 생성이 일어나도 먼저 들어간 한 쌍만 남고, 이후 재조회로 그 값을 쓴다.
 export async function getVapid(): Promise<Vapid | null> {
   if (cachedVapid) return cachedVapid;
   const sb = getSupabase();
-  const { data: existing } = await sb
-    .from("point_events")
-    .select("related_match_id")
-    .eq("type", "vapid_keys")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (existing?.related_match_id) {
-    try {
-      cachedVapid = JSON.parse(existing.related_match_id) as Vapid;
-      return cachedVapid;
-    } catch {
-      /* 손상 시 재생성 */
-    }
+  const read = async (): Promise<Vapid | null> => {
+    const { data } = await sb.from("app_config").select("value").eq("key", "vapid_keys").maybeSingle();
+    const v = data?.value as Vapid | undefined;
+    return v?.publicKey && v?.privateKey ? v : null;
+  };
+
+  const existing = await read();
+  if (existing) {
+    cachedVapid = existing;
+    return cachedVapid;
   }
-  const owner = await rootOwnerId();
-  if (!owner) return null; // 사용자가 아무도 없으면 보류
+
   const keys = webpush.generateVAPIDKeys();
-  const vapid: Vapid = { publicKey: keys.publicKey, privateKey: keys.privateKey };
-  await sb.from("point_events").insert({
-    id: genId(),
-    user_id: owner,
-    type: "vapid_keys",
-    points: 0,
-    related_match_id: JSON.stringify(vapid),
-    created_at: nowMs(),
+  const { error } = await sb.from("app_config").insert({
+    key: "vapid_keys",
+    value: { publicKey: keys.publicKey, privateKey: keys.privateKey },
+    updated_at: nowMs(),
   });
-  // 경쟁 상황 대비: 방금 넣은 것 말고 '가장 이른' 행을 다시 읽어 확정.
-  const { data: canon } = await sb
-    .from("point_events")
-    .select("related_match_id")
-    .eq("type", "vapid_keys")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  try {
-    cachedVapid = JSON.parse(canon!.related_match_id!) as Vapid;
-  } catch {
-    cachedVapid = vapid;
-  }
+  if (error && error.code !== "23505") return null; // 23505 = 다른 요청이 먼저 생성
+  cachedVapid = await read();
   return cachedVapid;
 }
 
@@ -89,48 +54,24 @@ export async function getPublicKey(): Promise<string | null> {
   return (await getVapid())?.publicKey ?? null;
 }
 
-// 구독 저장(같은 endpoint는 교체해 중복 방지).
+// 구독 저장. endpoint가 유니크라 같은 기기는 자동으로 한 행만 유지된다(소유자 갱신).
 export async function saveSubscription(userId: string, sub: PushSub): Promise<void> {
-  const sb = getSupabase();
-  const { data: rows } = await sb
-    .from("point_events")
-    .select("id, related_match_id")
-    .eq("user_id", userId)
-    .eq("type", "push_sub");
-  for (const r of rows ?? []) {
-    try {
-      const s = JSON.parse(r.related_match_id) as PushSub;
-      if (s.endpoint === sub.endpoint) await sb.from("point_events").delete().eq("id", r.id);
-    } catch {
-      /* 무시 */
-    }
-  }
-  await sb.from("point_events").insert({
-    id: genId(),
-    user_id: userId,
-    type: "push_sub",
-    points: 0,
-    related_match_id: JSON.stringify(sub),
-    created_at: nowMs(),
-  });
+  await getSupabase().from("push_subscriptions").upsert(
+    {
+      id: genId(),
+      user_id: userId,
+      endpoint: sub.endpoint,
+      p256dh: sub.keys.p256dh,
+      auth: sub.keys.auth,
+      created_at: nowMs(),
+    },
+    { onConflict: "endpoint" }
+  );
 }
 
 // endpoint로 구독 해제.
 export async function removeSubscription(userId: string, endpoint: string): Promise<void> {
-  const sb = getSupabase();
-  const { data: rows } = await sb
-    .from("point_events")
-    .select("id, related_match_id")
-    .eq("user_id", userId)
-    .eq("type", "push_sub");
-  for (const r of rows ?? []) {
-    try {
-      const s = JSON.parse(r.related_match_id) as PushSub;
-      if (s.endpoint === endpoint) await sb.from("point_events").delete().eq("id", r.id);
-    } catch {
-      /* 무시 */
-    }
-  }
+  await getSupabase().from("push_subscriptions").delete().eq("user_id", userId).eq("endpoint", endpoint);
 }
 
 interface SubRow {
@@ -142,19 +83,14 @@ interface SubRow {
 async function subsFor(userIds: string[]): Promise<SubRow[]> {
   if (!userIds.length) return [];
   const { data } = await getSupabase()
-    .from("point_events")
-    .select("id, user_id, related_match_id")
-    .in("user_id", userIds)
-    .eq("type", "push_sub");
-  const out: SubRow[] = [];
-  for (const r of data ?? []) {
-    try {
-      out.push({ id: r.id, user_id: r.user_id, sub: JSON.parse(r.related_match_id) as PushSub });
-    } catch {
-      /* 손상 구독 무시 */
-    }
-  }
-  return out;
+    .from("push_subscriptions")
+    .select("id, user_id, endpoint, p256dh, auth")
+    .in("user_id", userIds);
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    user_id: r.user_id,
+    sub: { endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } },
+  }));
 }
 
 export interface PushPayload {
@@ -180,7 +116,7 @@ export async function pushToUsers(userIds: string[], payload: PushPayload): Prom
         const code = (e as { statusCode?: number }).statusCode;
         if (code === 404 || code === 410) {
           try {
-            await sb.from("point_events").delete().eq("id", r.id);
+            await sb.from("push_subscriptions").delete().eq("id", r.id); // 만료된 구독 정리
           } catch {
             /* 정리 실패 무시 */
           }

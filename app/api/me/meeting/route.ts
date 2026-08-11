@@ -27,11 +27,7 @@ export async function GET(req: NextRequest) {
   // 사진은 매칭함과 동일하게 "양측 photo_consent"가 모두 있을 때만 공개한다.
   // (여기서 무조건 공개하면 상대가 동의하지 않아도 사진이 노출된다 — 서비스 약속 위반)
   const bothConsented = async () => {
-    const { data: ev } = await sb
-      .from("point_events")
-      .select("user_id")
-      .eq("type", "photo_consent")
-      .eq("related_match_id", mt.match_id);
+    const { data: ev } = await sb.from("photo_consents").select("user_id").eq("match_id", mt.match_id);
     const s = new Set((ev ?? []).map((e) => e.user_id));
     return s.has(user.id) && s.has(partner.id);
   };

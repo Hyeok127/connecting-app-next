@@ -14,7 +14,7 @@ export interface PublicUser {
   region: string | null;
   mbti: string | null;
   keywords: string[];
-  values: Record<string, string>; // 가치관 설문(users.workplace에 JSON 저장) — 근무지 컬럼 재사용
+  values: Record<string, string>; // 가치관 설문 (users.life_values)
   status: UserRow["status"];
   createdAt: number;
   photos?: string[];
@@ -41,7 +41,7 @@ export function publicUser(u: UserRow, opts: { photos?: boolean; contact?: boole
     region: u.region,
     mbti: u.mbti,
     keywords: parseJsonArray(u.keywords),
-    values: parseValues(u.workplace), // workplace 컬럼을 가치관 JSON 저장에 재사용
+    values: parseValues(u.life_values ?? u.workplace), // 이관 전 레거시(workplace)도 허용
     status: u.status,
     createdAt: u.created_at,
   };

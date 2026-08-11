@@ -63,13 +63,13 @@ export async function POST(req: NextRequest) {
     if (photos.length > 3) return fail("사진은 최대 3장까지 가능합니다.", 400);
     if (!photos.every((p) => PHOTO_PATH_RE.test(p)))
       return fail("사진 경로가 올바르지 않습니다.", 400);
-    // 가치관 설문(술/담배/문신/종교)은 근무지 폐지로 빈 workplace 컬럼에 JSON으로 저장(DDL 회피).
+    // 가치관 설문(술/담배/문신/종교) — users.life_values(jsonb)
     const values = cleanValues(body.values);
     cols = {
       gender: String(body.gender),
       age,
       job: String(body.job ?? "").trim() || null,
-      workplace: Object.keys(values).length ? JSON.stringify(values) : null,
+      life_values: Object.keys(values).length ? values : null,
       region: String(body.region ?? "").trim() || null,
       mbti: String(body.mbti ?? "").trim().toUpperCase() || null,
       keywords: JSON.stringify(cleanKw),
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       gender: null,
       age: null,
       job: null,
-      workplace: null,
+      life_values: null,
       region: null,
       mbti: null,
       keywords: "[]",
@@ -105,6 +105,9 @@ export async function POST(req: NextRequest) {
     invited_by: inviter.id,
     invite_code,
     is_admin: 0,
+    // 약관·개인정보처리방침 동의(개정 시 LEGAL_VERSION을 올려 재동의 판별)
+    consent_version: LEGAL_VERSION,
+    consent_at: nowMs(),
     created_at: nowMs(),
   });
   if (error) {
@@ -113,22 +116,12 @@ export async function POST(req: NextRequest) {
     return fail(error.message, 400);
   }
 
-  // 약관·개인정보처리방침 동의 기록(개정 시 LEGAL_VERSION을 올려 재동의 판별).
-  // 스키마 변경 없이 point_events에 이벤트로 남긴다.
-  await sb.from("point_events").insert({
-    id: genId(),
-    user_id: id,
-    type: `consent|${LEGAL_VERSION}`,
-    points: 0,
-    created_at: nowMs(),
-  });
-
   // 가입 시 선호 조건 (선택, R24) — 성별/나이/직업/지역 하드 필터 + 바라는 가치관.
   if (role === "member") {
     const genders = parseArr(body.pref_genders).filter((g) => ["남성", "여성"].includes(g));
     const jobs = parseArr(body.pref_jobs);
     const regions = parseArr(body.pref_regions);
-    const valuePrefs = cleanValuePrefs(body.value_prefs); // 바라는 가치관 → workplaces 재사용
+    const valuePrefs = cleanValuePrefs(body.value_prefs); // 바라는 가치관
     const ageMin = body.pref_age_min ? Number(body.pref_age_min) : null;
     const ageMax = body.pref_age_max ? Number(body.pref_age_max) : null;
     if (genders.length || ageMin || ageMax || jobs.length || regions.length || Object.keys(valuePrefs).length) {
@@ -138,7 +131,7 @@ export async function POST(req: NextRequest) {
         age_min: ageMin,
         age_max: ageMax,
         jobs: JSON.stringify(jobs),
-        workplaces: JSON.stringify(valuePrefs), // 바라는 가치관
+        value_prefs: valuePrefs, // 바라는 가치관
         regions: JSON.stringify(regions),
         mbtis: "[]",
         updated_at: nowMs(),

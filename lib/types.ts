@@ -12,7 +12,12 @@ export interface UserRow {
   gender: string | null;
   age: number | null;
   job: string | null;
+  /** @deprecated 005에서 life_values로 이관. 006에서 삭제 예정 */
   workplace: string | null;
+  life_values: Record<string, string> | null; // 가치관(흡연/음주/문신/종교)
+  email: string | null; // 알림 이메일
+  consent_version: string | null; // 동의한 약관 버전
+  consent_at: number | null;
   region: string | null;
   mbti: string | null;
   keywords: string; // JSON array
@@ -57,7 +62,9 @@ export interface PreferencesRow {
   age_min: number | null;
   age_max: number | null;
   jobs: string;
+  /** @deprecated 005에서 value_prefs로 이관. 006에서 삭제 예정 */
   workplaces: string;
+  value_prefs: Record<string, string[]> | null; // 상대에게 바라는 가치관
   regions: string;
   mbtis: string;
   updated_at: number;
