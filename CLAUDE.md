@@ -25,6 +25,23 @@ gh api repos/Hyeok127/connecting-app-next/deployments \
 서비스이므로 `app/`·`lib/`·`components/`를 고칠 땐 push 전에 `npm run build`와
 `scripts/smoke_run.sh`를 반드시 통과시킨다.
 
+## 로컬 미리보기(휴대폰 확인) 운영 노트 (2026-08-11)
+
+dev 변경을 배포 전 휴대폰에서 볼 때, 노트북(nt9)에서 프로덕션 빌드를 띄우고 tailnet으로 연다.
+
+- **서버**: `PORT=3211 npx next start`(프로덕션 빌드). dev 모드(3210)는 자산 지연이 커서
+  휴대폰에서 느리다. `tailscale serve --bg 3211` → `https://laptop-nt9-wsl.taildfcc41.ts.net`.
+  (`tailscale set --operator=jsh` 1회 필요. 직접 IP는 `http://100.125.135.35:3211`.)
+- **⚠️ 재기동 시 반드시 `pkill -9 -f next-server`**. `next start`가 띄우는 실제 프로세스명은
+  `next start`가 아니라 **`next-server`**다. `pkill -f "next start"`로는 안 죽어서, 옛 서버가
+  포트 3211을 계속 잡고 새 빌드가 포트 충돌로 안 뜬다 → "변경이 반영 안 됨"의 실제 원인이었다
+  (2026-08-11에 이걸로 여러 번 헤맴). 재빌드 스크립트도 next-server를 kill하도록 할 것.
+- **페이지는 동적 렌더(`export const dynamic = "force-dynamic"`)로 고정**했다. 원래 로그인 등
+  페이지가 정적 프리렌더라 `Cache-Control: s-maxage=31536000`으로 서빙돼 브라우저가 옛 화면을
+  오래 캐시했다. 동적 전환 + `next.config` 문서 no-store 헤더로 항상 최신을 받는다. (auth 게이트
+  앱이라 정적 최적화 손해는 미미.)
+- 캐시로 옛 화면이 남으면 `?v=N` 붙이거나 시크릿 탭.
+
 ## 브랜치 전략 — 평소 작업은 `dev`에서 (2026-08-09 도입)
 
 위 문제 때문에 **push와 배포를 분리**했다.

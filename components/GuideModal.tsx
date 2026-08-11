@@ -17,11 +17,11 @@ export function GuideModal() {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-ink/40 p-4"
+          className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/60 p-4"
           onClick={() => setOpen(false)}
         >
           <div
-            className="my-8 w-full max-w-md rounded-2xl border border-line bg-paper p-6 shadow-xl"
+            className="my-8 h-fit w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between">
