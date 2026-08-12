@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
-import { Avatar, KeywordChips, MatchStrength, Empty, CardSkeletonGrid, TrustBadge } from "@/components/ui";
+import { Avatar, KeywordChips, MatchStrength, Empty, CardSkeletonGrid } from "@/components/ui";
 import { ReportBlock } from "@/components/ReportBlock";
 import { CompletionNudge } from "@/components/ProfileMeter";
 import { GuideModal } from "@/components/GuideModal";
@@ -19,7 +19,6 @@ interface Candidate {
   mbti: string | null;
   keywords: string[];
   values?: Record<string, string>;
-  trust_score?: number;
   match?: {
     strength: number;
     score: number;
@@ -147,11 +146,6 @@ export function Home() {
                         {c.job && c.region ? " · " : ""}
                         {c.region ? `사는 곳: ${c.region}` : ""}
                       </p>
-                      {typeof c.trust_score === "number" && (
-                        <div className="mt-1">
-                          <TrustBadge score={c.trust_score} />
-                        </div>
-                      )}
                     </div>
                   </div>
                   {c.match && (

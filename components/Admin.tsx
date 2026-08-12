@@ -219,7 +219,7 @@ export function Admin() {
                         <div className="flex flex-wrap items-center gap-2">
                           <strong className="text-ink">{u.name}</strong>
                           <Badge status={u.status} />
-                          {u.role === "member" && <TrustBadge score={u.trust_score} />}
+                          {u.role === "member" && <TrustBadge score={u.trust_score} always />}
                         </div>
                         <p className="mt-1 text-xs leading-relaxed text-ink-faint">
                           {u.role === "member" ? "일반" : "주선자"}

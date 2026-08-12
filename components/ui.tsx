@@ -102,9 +102,13 @@ export function ValueChips({ values }: { values?: Record<string, string> }) {
 }
 
 // 신뢰도 배지 — 기본 50점. 약속 이행(+5)/노쇼(-50)로 변동.
-//   ≥60 좋음 / 40~59 보통 / <40 주의. 정확한 숫자 대신 coarse 라벨로 노출.
-export function TrustBadge({ score, showScore = false }: { score: number; showScore?: boolean }) {
+//   ≥60 좋음 / 40~59 보통 / <40 주의.
+// 기본값(50)에서는 모두가 "보통"이라 정보가 없으므로, 사용자 화면에서는
+// 중간 구간을 숨기고 의미가 생겼을 때(좋음/주의)만 표시한다.
+// always=true(관리자·본인 프로필)면 항상 표시한다.
+export function TrustBadge({ score, showScore = false, always = false }: { score: number; showScore?: boolean; always?: boolean }) {
   const level = score >= 60 ? "good" : score >= 40 ? "ok" : "low";
+  if (level === "ok" && !always && !showScore) return null; // 기본값 구간은 숨김
   const cfg = {
     good: { label: "신뢰도 좋음", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     ok: { label: "신뢰도 보통", cls: "bg-cream text-ink-soft border-line" },

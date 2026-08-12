@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     const counterpartBase = exchanged
       ? await publicUserWithPhotos(other)
       : publicUser(other);
-    const counterpart = { ...counterpartBase, trust_score: other.trust_score }; // R11 신뢰도
+    const counterpart = counterpartBase; // 신뢰도는 참가자에게 노출하지 않음(관리자 전용)
     const item: Record<string, unknown> = {
       id: m.id,
       state: m.state,

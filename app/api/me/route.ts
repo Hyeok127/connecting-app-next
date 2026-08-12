@@ -49,7 +49,8 @@ export async function PUT(req: NextRequest) {
     if (body.age !== undefined) sets.age = body.age ? Number(body.age) : null;
     if (body.gender && ["남성", "여성"].includes(String(body.gender))) sets.gender = String(body.gender);
     if (body.mbti !== undefined) sets.mbti = String(body.mbti).trim().toUpperCase() || null;
-    for (const f of ["job", "region", "contact"] as const) {
+    // 연락처는 여기서 받지 않는다 — 매칭 수락 시에만 설정(사진 교환과 동일 원칙).
+    for (const f of ["job", "region"] as const) {
       if (body[f] !== undefined) sets[f] = String(body[f]).trim() || null;
     }
     // 가치관 설문 — users.life_values(jsonb)

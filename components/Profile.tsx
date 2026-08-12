@@ -5,7 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { uploadPhotos } from "@/lib/upload";
-import { Avatar, Badge, KeywordChips, ValueChips, Spinner, Empty, TrustBadge } from "@/components/ui";
+import { Avatar, Badge, KeywordChips, ValueChips, Spinner, Empty } from "@/components/ui";
 import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
 import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
@@ -83,7 +83,7 @@ export function Profile() {
         mbti: f.get("mbti"),
         keywords: f.getAll("kw"),
         values: JSON.parse(String(f.get("values") || "{}")),
-        contact: f.get("contact"),
+        // 연락처는 프로필에서 받지 않는다 — 매칭 수락 시에만 입력(사진 교환과 동일한 원칙)
       };
       if (photos) body.photos = photos;
       await api("/me", { method: "PUT", body: JSON.stringify(body) });
@@ -183,7 +183,6 @@ export function Profile() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-display text-lg font-bold text-ink">{user.name}</span>
               <Badge status={user.status} />
-              {isMember && <TrustBadge score={user.trust_score} showScore />}
             </div>
             <p className="text-sm text-ink-faint">
               {isMember ? "일반 회원" : "주선자"} · 포인트 {user.points}점
@@ -249,12 +248,10 @@ export function Profile() {
             <ValuesSurvey defaultValues={user.values || {}} />
           </div>
           <label className={`${labelCls} mt-3`}>
-            연락처 <input name="contact" defaultValue={user.contact ?? ""} placeholder="카톡ID 또는 전화번호" className={inputCls} />
-          </label>
-          <label className={`${labelCls} mt-3`}>
             사진 (선택, 1~3장 — 매칭 성사 후 서로 동의했을 때만 교환돼요)
             <input name="photos" type="file" accept="image/*" multiple className={inputCls} />
           </label>
+          <p className="mt-2 text-xs text-ink-faint">※ 연락처는 매칭을 수락할 때 입력해요. 성사된 상대에게만 공개됩니다.</p>
           <button disabled={busy} className="mt-5 w-full rounded-xl bg-wine-600 py-2.5 text-sm font-semibold text-paper transition hover:bg-wine-700 disabled:opacity-40">
             {busy ? "저장 중..." : "저장"}
           </button>

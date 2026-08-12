@@ -4,7 +4,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { uploadPhotos } from "@/lib/upload";
-import { Avatar, Spinner, Empty, TrustBadge } from "@/components/ui";
+import { Avatar, Spinner, Empty } from "@/components/ui";
 import { ReportBlock } from "@/components/ReportBlock";
 
 interface MatchItem {
@@ -23,7 +23,6 @@ interface MatchItem {
     name: string;
     age: number | null;
     job: string | null;
-    trust_score?: number;
     photos?: string[];
   };
 }
@@ -298,11 +297,6 @@ export function Matches() {
                     <p className="text-xs text-ink-faint">
                       {c.age ?? "?"}세 · {c.job ?? ""}
                     </p>
-                    {typeof c.trust_score === "number" && (
-                      <div className="mt-1">
-                        <TrustBadge score={c.trust_score} />
-                      </div>
-                    )}
                   </div>
                 </div>
 
