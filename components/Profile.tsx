@@ -9,6 +9,9 @@ import { Avatar, Badge, KeywordChips, ValueChips, Spinner, Empty } from "@/compo
 import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
 import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
+import { ChipSelect } from "@/components/ChipSelect";
+import { RegionPicker } from "@/components/RegionPicker";
+import { JOB_CATEGORIES } from "@/lib/profileOptions";
 import { ProfileMeter } from "@/components/ProfileMeter";
 import { PushToggle } from "@/components/PushToggle";
 
@@ -106,8 +109,8 @@ export function Profile() {
           genders: f.getAll("pgender"),
           age_min: f.get("age_min"),
           age_max: f.get("age_max"),
-          jobs: f.get("jobs"),
-          regions: f.get("regions"),
+          jobs: f.getAll("jobs"),
+          regions: f.getAll("regions"),
           mbtis: prefs?.mbtis ?? [], // 폼엔 없지만 기존 값 유지(빈 배열로 덮어쓰지 않도록)
           value_prefs: JSON.parse(String(f.get("value_prefs") || "{}")),
         }),
@@ -223,19 +226,23 @@ export function Profile() {
       )}
 
       {isMember && (
-        <form onSubmit={saveProfile} className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
+        <form key={user.id} onSubmit={saveProfile} className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
           <h3 className="mb-4 font-display font-semibold text-ink">프로필 수정</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <label className={labelCls}>
-              직업 및 직장 (선택) <input name="job" defaultValue={user.job ?? ""} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              사는 곳 (선택) <input name="region" defaultValue={user.region ?? ""} className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              MBTI (선택) <input name="mbti" maxLength={4} defaultValue={user.mbti ?? ""} className={inputCls} />
-            </label>
+          <div className="mb-3">
+            <p className={labelCls}>직군 (선택)</p>
+            <div className="mt-1">
+              <ChipSelect name="job" options={JOB_CATEGORIES} defaultSelected={user.job ? [user.job] : []} placeholder="해당하는 직군을 하나 골라주세요." />
+            </div>
           </div>
+          <div className="mb-3">
+            <p className={labelCls}>사는 곳 (선택)</p>
+            <div className="mt-1">
+              <RegionPicker name="region" single defaultSelected={user.region ? [user.region] : []} />
+            </div>
+          </div>
+          <label className={`${labelCls} block`}>
+            MBTI (선택) <input name="mbti" maxLength={4} defaultValue={user.mbti ?? ""} className={inputCls} />
+          </label>
           <div className="mt-3">
             <KeywordPicker
               name="kw"
@@ -275,8 +282,14 @@ export function Profile() {
             <input name="age_min" type="number" placeholder="최소 나이" defaultValue={prefs?.age_min ?? ""} className={inputCls} />
             <input name="age_max" type="number" placeholder="최대 나이" defaultValue={prefs?.age_max ?? ""} className={inputCls} />
           </div>
-          <input name="jobs" placeholder="직업 (콤마 구분)" defaultValue={(prefs?.jobs ?? []).join(", ")} className={`mt-2 ${inputCls}`} />
-          <input name="regions" placeholder="사는 곳 (콤마 구분)" defaultValue={(prefs?.regions ?? []).join(", ")} className={`mt-2 ${inputCls}`} />
+          <div className="mt-3">
+            <p className="mb-1 text-sm font-medium text-ink-soft">바라는 직군 (여러 개 가능)</p>
+            <ChipSelect name="jobs" options={JOB_CATEGORIES} multiple defaultSelected={prefs?.jobs ?? []} placeholder="비워두면 직군 제한 없음." />
+          </div>
+          <div className="mt-3">
+            <p className="mb-1 text-sm font-medium text-ink-soft">바라는 지역 (여러 개 가능)</p>
+            <RegionPicker name="regions" defaultSelected={prefs?.regions ?? []} />
+          </div>
           <div className="mt-4">
             <p className="text-sm font-medium text-ink-soft">상대에게 바라는 가치관</p>
             <p className="mt-0.5 mb-2 text-xs text-ink-faint">허용할 값을 고르면 그런 상대가 추천 상위로 와요. 안 고르면 상관없음.</p>

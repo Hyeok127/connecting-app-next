@@ -4,6 +4,7 @@ import { MAX_RANK } from "@/lib/constants";
 import type { PreferencesRow, UserRow } from "@/lib/types";
 import { parseJsonArray } from "@/lib/serialize";
 import { parseValues, parseValuePrefs, valuePreferenceScore, satisfiedPrefReasons } from "@/lib/values";
+import { regionCovers } from "@/lib/profileOptions";
 import keywordVectors from "@/lib/keyword_vectors.json";
 
 // 사전계산 임베딩(정규화+centering된 단위벡터). 런타임엔 이 벡터 코사인만 쓴다(API/모델 없음).
@@ -70,7 +71,8 @@ export function fits(prefs: Prefs | null, u: UserRow): boolean {
   if (prefs.age_min && (!u.age || u.age < prefs.age_min)) return false;
   if (prefs.age_max && (!u.age || u.age > prefs.age_max)) return false;
   if (prefs.jobs.length && !prefs.jobs.includes(u.job ?? "")) return false;
-  if (prefs.regions.length && !prefs.regions.includes(u.region ?? "")) return false;
+  // 지역은 시/도 선호가 그 안의 구/시를 커버(prefix). "서울"은 "서울 강남구"를 포함.
+  if (prefs.regions.length && !prefs.regions.some((r) => regionCovers(r, u.region ?? ""))) return false;
   if (prefs.mbtis.length && u.mbti && !prefs.mbtis.includes(u.mbti)) return false;
   return true;
 }

@@ -7,6 +7,9 @@ import { api } from "@/lib/api";
 import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
 import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
+import { ChipSelect } from "@/components/ChipSelect";
+import { RegionPicker } from "@/components/RegionPicker";
+import { JOB_CATEGORIES } from "@/lib/profileOptions";
 import { GuideModal } from "@/components/GuideModal";
 import type { User } from "@/lib/types";
 
@@ -81,6 +84,8 @@ export function AuthPage() {
           pref_genders: f.getAll("pref_genders"),
           pref_age_min: f.get("pref_age_min"),
           pref_age_max: f.get("pref_age_max"),
+          pref_jobs: f.getAll("pref_jobs"),
+          pref_regions: f.getAll("pref_regions"),
           value_prefs: JSON.parse(String(f.get("value_prefs") || "{}")),
         });
       }
@@ -222,14 +227,18 @@ export function AuthPage() {
               나이
               <input name="age" type="number" min={19} max={99} className={inputCls} />
             </label>
-            <label className={labelCls}>
-              직업 및 직장 (선택)
-              <input name="job" placeholder="예: 개발자 / 간호사" className={inputCls} />
-            </label>
-            <label className={labelCls}>
-              사는 곳 (선택)
-              <input name="region" placeholder="예: 서울 — 시/구 단위면 충분해요" className={inputCls} />
-            </label>
+            <div>
+              <p className={labelCls}>직군 (선택)</p>
+              <div className="mt-1">
+                <ChipSelect name="job" options={JOB_CATEGORIES} placeholder="해당하는 직군을 하나 골라주세요." />
+              </div>
+            </div>
+            <div>
+              <p className={labelCls}>사는 곳 (선택)</p>
+              <div className="mt-1">
+                <RegionPicker name="region" single />
+              </div>
+            </div>
             <label className={labelCls}>
               MBTI (선택)
               <input name="mbti" maxLength={4} placeholder="예: ENFP" className={inputCls} />
@@ -261,6 +270,14 @@ export function AuthPage() {
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input name="pref_age_min" type="number" placeholder="최소 나이" className={inputCls} />
                 <input name="pref_age_max" type="number" placeholder="최대 나이" className={inputCls} />
+              </div>
+              <div className="mt-3">
+                <p className="mb-1 text-sm font-medium text-ink-soft">바라는 직군 (여러 개 가능)</p>
+                <ChipSelect name="pref_jobs" options={JOB_CATEGORIES} multiple placeholder="비워두면 직군 제한 없음." />
+              </div>
+              <div className="mt-3">
+                <p className="mb-1 text-sm font-medium text-ink-soft">바라는 지역 (여러 개 가능)</p>
+                <RegionPicker name="pref_regions" />
               </div>
               <div className="mt-3">
                 <p className="text-sm font-medium text-ink-soft">상대에게 바라는 가치관 (선택)</p>
