@@ -9,7 +9,7 @@ import { ValuesSurvey } from "@/components/ValuesSurvey";
 import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
 import { ChipSelect } from "@/components/ChipSelect";
 import { RegionPicker } from "@/components/RegionPicker";
-import { JOB_CATEGORIES } from "@/lib/profileOptions";
+import { JOB_TYPES, JOB_ROLES } from "@/lib/profileOptions";
 import { GuideModal } from "@/components/GuideModal";
 import type { User } from "@/lib/types";
 
@@ -76,7 +76,8 @@ export function AuthPage() {
         Object.assign(body, {
           gender: f.get("gender"),
           age: f.get("age"),
-          job: f.get("job"),
+          job_type: f.get("job_type"),
+          job_role: f.get("job_role"),
           region: f.get("region"),
           mbti: f.get("mbti"),
           keywords: f.getAll("kw"),
@@ -84,7 +85,8 @@ export function AuthPage() {
           pref_genders: f.getAll("pref_genders"),
           pref_age_min: f.get("pref_age_min"),
           pref_age_max: f.get("pref_age_max"),
-          pref_jobs: f.getAll("pref_jobs"),
+          pref_job_types: f.getAll("pref_job_types"),
+          pref_job_roles: f.getAll("pref_job_roles"),
           pref_regions: f.getAll("pref_regions"),
           value_prefs: JSON.parse(String(f.get("value_prefs") || "{}")),
         });
@@ -228,9 +230,15 @@ export function AuthPage() {
               <input name="age" type="number" min={19} max={99} className={inputCls} />
             </label>
             <div>
-              <p className={labelCls}>직군 (선택)</p>
+              <p className={labelCls}>직장유형 (선택)</p>
               <div className="mt-1">
-                <ChipSelect name="job" options={JOB_CATEGORIES} placeholder="해당하는 직군을 하나 골라주세요." />
+                <ChipSelect name="job_type" options={JOB_TYPES} placeholder="어디서 일하는지 하나 골라주세요." />
+              </div>
+            </div>
+            <div>
+              <p className={labelCls}>직무 (선택)</p>
+              <div className="mt-1">
+                <ChipSelect name="job_role" options={JOB_ROLES} placeholder="무슨 일을 하는지 하나 골라주세요." />
               </div>
             </div>
             <div>
@@ -272,8 +280,12 @@ export function AuthPage() {
                 <input name="pref_age_max" type="number" placeholder="최대 나이" className={inputCls} />
               </div>
               <div className="mt-3">
-                <p className="mb-1 text-sm font-medium text-ink-soft">바라는 직군 (여러 개 가능)</p>
-                <ChipSelect name="pref_jobs" options={JOB_CATEGORIES} multiple placeholder="비워두면 직군 제한 없음." />
+                <p className="mb-1 text-sm font-medium text-ink-soft">바라는 직장유형 (여러 개 가능)</p>
+                <ChipSelect name="pref_job_types" options={JOB_TYPES} multiple placeholder="비워두면 직장유형 제한 없음." />
+              </div>
+              <div className="mt-3">
+                <p className="mb-1 text-sm font-medium text-ink-soft">바라는 직무 (여러 개 가능)</p>
+                <ChipSelect name="pref_job_roles" options={JOB_ROLES} multiple placeholder="비워두면 직무 제한 없음." />
               </div>
               <div className="mt-3">
                 <p className="mb-1 text-sm font-medium text-ink-soft">바라는 지역 (여러 개 가능)</p>

@@ -14,7 +14,8 @@ interface Candidate {
   name: string;
   gender: string | null;
   age: number | null;
-  job: string | null;
+  jobType?: string | null;
+  jobRole?: string | null;
   region: string | null;
   mbti: string | null;
   keywords: string[];
@@ -142,8 +143,8 @@ export function Home() {
                         </span>
                       </div>
                       <p className="truncate text-sm text-ink-soft">
-                        {c.job ?? ""}
-                        {c.job && c.region ? " · " : ""}
+                        {[c.jobType, c.jobRole].filter(Boolean).join(" ")}
+                        {(c.jobType || c.jobRole) && c.region ? " · " : ""}
                         {c.region ? `사는 곳: ${c.region}` : ""}
                       </p>
                     </div>
@@ -216,7 +217,7 @@ export function Home() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-ink">{c?.name}</div>
-                    <div className="text-xs text-ink-faint">{c?.job}</div>
+                    <div className="text-xs text-ink-faint">{[c?.jobType, c?.jobRole].filter(Boolean).join(" ")}</div>
                   </div>
                   {!confirmedToday && (
                     <div className="flex gap-1">

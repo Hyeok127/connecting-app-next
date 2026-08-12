@@ -39,9 +39,17 @@ export interface Prefs {
   genders: string[];
   age_min: number | null;
   age_max: number | null;
-  jobs: string[];
+  jobTypes: string[]; // 바라는 직장유형
+  jobRoles: string[]; // 바라는 직무
   regions: string[];
   mbtis: string[];
+}
+
+// jsonb 배열 또는 레거시 JSON 문자열 모두 허용.
+function asArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x));
+  if (typeof v === "string") return parseJsonArray(v);
+  return [];
 }
 
 function rowToPrefs(r: PreferencesRow): Prefs {
@@ -49,7 +57,8 @@ function rowToPrefs(r: PreferencesRow): Prefs {
     genders: parseJsonArray(r.genders),
     age_min: r.age_min,
     age_max: r.age_max,
-    jobs: parseJsonArray(r.jobs),
+    jobTypes: asArray(r.job_types),
+    jobRoles: asArray(r.job_roles),
     regions: parseJsonArray(r.regions),
     mbtis: parseJsonArray(r.mbtis),
   };
@@ -70,7 +79,8 @@ export function fits(prefs: Prefs | null, u: UserRow): boolean {
   if (prefs.genders.length && !prefs.genders.includes(u.gender ?? "")) return false;
   if (prefs.age_min && (!u.age || u.age < prefs.age_min)) return false;
   if (prefs.age_max && (!u.age || u.age > prefs.age_max)) return false;
-  if (prefs.jobs.length && !prefs.jobs.includes(u.job ?? "")) return false;
+  if (prefs.jobTypes.length && !prefs.jobTypes.includes(u.job_type ?? "")) return false;
+  if (prefs.jobRoles.length && !prefs.jobRoles.includes(u.job_role ?? "")) return false;
   // 지역은 시/도 선호가 그 안의 구/시를 커버(prefix). "서울"은 "서울 강남구"를 포함.
   if (prefs.regions.length && !prefs.regions.some((r) => regionCovers(r, u.region ?? ""))) return false;
   if (prefs.mbtis.length && u.mbti && !prefs.mbtis.includes(u.mbti)) return false;

@@ -10,7 +10,8 @@ interface AdminUser {
   role: string;
   gender: string | null;
   age: number | null;
-  job: string | null;
+  job_type: string | null;
+  job_role: string | null;
   region: string | null;
   mbti: string | null;
   status: string;
@@ -30,7 +31,8 @@ interface AdminUser {
     genders: string[];
     age_min: number | null;
     age_max: number | null;
-    jobs: string[];
+    job_types: string[];
+    job_roles: string[];
     regions: string[];
     value_prefs: Record<string, string[]>;
   } | null;
@@ -225,7 +227,7 @@ export function Admin() {
                           {u.role === "member" ? "일반" : "주선자"}
                           {u.is_admin && " · 관리자"}
                           {u.gender && ` · ${u.gender} ${u.age ?? "?"}세`}
-                          {u.job && ` · ${u.job}`}
+                          {(u.job_type || u.job_role) && ` · ${[u.job_type, u.job_role].filter(Boolean).join(" ")}`}
                           {u.region && ` · ${u.region}`}
                           <br />
                           초대자 {u.inviter_name || "(루트)"} · 포인트 {u.points} · 코드 {u.invite_code} · {new Date(u.created_at).toLocaleDateString("ko-KR")} 가입
@@ -245,7 +247,8 @@ export function Admin() {
                                 <span className="text-xs text-ink-soft">
                                   {u.prefs.genders.length ? u.prefs.genders.join("·") : "성별 무관"}
                                   {(u.prefs.age_min || u.prefs.age_max) && ` · ${u.prefs.age_min ?? ""}~${u.prefs.age_max ?? ""}세`}
-                                  {u.prefs.jobs.length ? ` · 직업 ${u.prefs.jobs.join(",")}` : ""}
+                                  {u.prefs.job_types.length ? ` · 직장 ${u.prefs.job_types.join(",")}` : ""}
+                                  {u.prefs.job_roles.length ? ` · 직무 ${u.prefs.job_roles.join(",")}` : ""}
                                   {u.prefs.regions.length ? ` · 지역 ${u.prefs.regions.join(",")}` : ""}
                                   {Object.keys(u.prefs.value_prefs).length ? ` · 가치관 ${Object.entries(u.prefs.value_prefs).map(([k, v]) => `${k}:${v.join("/")}`).join(", ")}` : ""}
                                 </span>

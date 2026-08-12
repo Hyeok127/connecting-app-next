@@ -9,6 +9,7 @@ import { genId, nowMs, parseArr, PHOTO_PATH_RE, genInviteCode } from "@/lib/util
 import { publicUserWithPhotos } from "@/lib/serialize";
 import { cleanKeywords } from "@/lib/keywords";
 import { cleanValues, cleanValuePrefs } from "@/lib/values";
+import { JOB_TYPES, JOB_ROLES } from "@/lib/profileOptions";
 import { LEGAL_VERSION } from "@/lib/legal";
 import type { UserRow } from "@/lib/types";
 
@@ -68,7 +69,8 @@ export async function POST(req: NextRequest) {
     cols = {
       gender: String(body.gender),
       age,
-      job: String(body.job ?? "").trim() || null,
+      job_type: JOB_TYPES.includes(String(body.job_type) as never) ? String(body.job_type) : null,
+      job_role: JOB_ROLES.includes(String(body.job_role) as never) ? String(body.job_role) : null,
       life_values: Object.keys(values).length ? values : null,
       region: String(body.region ?? "").trim() || null,
       mbti: String(body.mbti ?? "").trim().toUpperCase() || null,
@@ -119,18 +121,20 @@ export async function POST(req: NextRequest) {
   // 가입 시 선호 조건 (선택, R24) — 성별/나이/직업/지역 하드 필터 + 바라는 가치관.
   if (role === "member") {
     const genders = parseArr(body.pref_genders).filter((g) => ["남성", "여성"].includes(g));
-    const jobs = parseArr(body.pref_jobs);
+    const jobTypes = parseArr(body.pref_job_types).filter((x) => JOB_TYPES.includes(x as never));
+    const jobRoles = parseArr(body.pref_job_roles).filter((x) => JOB_ROLES.includes(x as never));
     const regions = parseArr(body.pref_regions);
     const valuePrefs = cleanValuePrefs(body.value_prefs); // 바라는 가치관
     const ageMin = body.pref_age_min ? Number(body.pref_age_min) : null;
     const ageMax = body.pref_age_max ? Number(body.pref_age_max) : null;
-    if (genders.length || ageMin || ageMax || jobs.length || regions.length || Object.keys(valuePrefs).length) {
+    if (genders.length || ageMin || ageMax || jobTypes.length || jobRoles.length || regions.length || Object.keys(valuePrefs).length) {
       await sb.from("preferences").insert({
         user_id: id,
         genders: JSON.stringify(genders),
         age_min: ageMin,
         age_max: ageMax,
-        jobs: JSON.stringify(jobs),
+        job_types: jobTypes,
+        job_roles: jobRoles,
         value_prefs: valuePrefs, // 바라는 가치관
         regions: JSON.stringify(regions),
         mbtis: "[]",

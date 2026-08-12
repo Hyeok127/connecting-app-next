@@ -94,10 +94,21 @@ export function GuideModal({ open: openProp, onClose }: { open?: boolean; onClos
 
             {/* 추천 기준 */}
             <h3 className="mt-6 mb-2 font-display font-semibold text-ink">추천은 이렇게 정해져요</h3>
-            <ul className="space-y-1.5 text-sm text-ink-soft">
-              <li>· <b className="text-ink">관심사 키워드</b>는 비슷할수록 위로 — 유의어(등산~캠핑)도 연결돼요.</li>
-              <li>· <b className="text-ink">가치관</b>(흡연·음주·문신·종교)은 같을수록 가산점이 붙어요.</li>
-              <li>· 성별·나이 등 <b className="text-ink">선호 조건</b>에 맞지 않으면 추천에서 빠져요.</li>
+            <p className="mb-2 text-xs text-ink-faint">
+              추천은 <b className="text-ink">① 선호 조건으로 거르고 → ② 남은 사람을 점수순으로 정렬</b>하는 2단계예요.
+            </p>
+            <p className="mb-1 text-sm font-medium text-ink">① 선호 조건 (맞지 않으면 아예 제외 — 하드 필터)</p>
+            <ul className="mb-3 space-y-1 text-sm text-ink-soft">
+              <li>· <b className="text-ink">성별·나이</b> — 내가 정한 범위 밖이면 제외돼요.</li>
+              <li>· <b className="text-ink">직장유형·직무</b> — 고른 항목이 있으면 그 중 하나에 맞아야 해요(안 고르면 무관).</li>
+              <li>· <b className="text-ink">지역</b> — 시/도만 고르면 그 안 전체를 포함해요(예: ‘서울’ = 서울 모든 구). 구·시까지 고르면 그 지역만.</li>
+              <li className="text-ink-faint">· 조건은 <b className="text-ink">양방향</b>이에요 — 내 조건에 상대가 맞고, 상대 조건에도 내가 맞아야 서로 추천돼요.</li>
+            </ul>
+            <p className="mb-1 text-sm font-medium text-ink">② 점수 정렬 (높을수록 위로)</p>
+            <ul className="space-y-1 text-sm text-ink-soft">
+              <li>· <b className="text-ink">관심사 키워드</b>가 비슷할수록 점수가 올라가요 — 유의어(등산~캠핑, 와인~위스키)도 부분 인정.</li>
+              <li>· <b className="text-ink">바라는 가치관</b>(흡연·음주·문신·종교)을 상대가 충족하면 가산점.</li>
+              <li className="text-ink-faint">· 동점이면 먼저 가입한 순으로 정렬돼요.</li>
             </ul>
 
             <div className="mt-6 rounded-xl border border-gold-100 bg-gold-100/30 p-4 text-xs leading-relaxed text-ink-soft">

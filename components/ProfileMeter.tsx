@@ -15,7 +15,7 @@ export function completionItems(
   const v = user?.values ?? {};
   return [
     { key: "basic", label: "성별·나이", done: !!user?.gender && !!user?.age },
-    { key: "job", label: "직업", done: !!user?.job },
+    { key: "job", label: "직장·직무", done: !!user?.jobType || !!user?.jobRole },
     { key: "region", label: "사는 곳", done: !!user?.region },
     { key: "mbti", label: "MBTI", done: !!user?.mbti },
     { key: "keywords", label: "관심 키워드", done: (user?.keywords?.length ?? 0) >= 1 },

@@ -22,7 +22,8 @@ interface MatchItem {
     id: string;
     name: string;
     age: number | null;
-    job: string | null;
+    jobType?: string | null;
+    jobRole?: string | null;
     photos?: string[];
   };
 }
@@ -295,7 +296,7 @@ export function Matches() {
                       )}
                     </div>
                     <p className="text-xs text-ink-faint">
-                      {c.age ?? "?"}세 · {c.job ?? ""}
+                      {c.age ?? "?"}세{(c.jobType || c.jobRole) && ` · ${[c.jobType, c.jobRole].filter(Boolean).join(" ")}`}
                     </p>
                   </div>
                 </div>

@@ -11,7 +11,7 @@ import { ValuesSurvey } from "@/components/ValuesSurvey";
 import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
 import { ChipSelect } from "@/components/ChipSelect";
 import { RegionPicker } from "@/components/RegionPicker";
-import { JOB_CATEGORIES } from "@/lib/profileOptions";
+import { JOB_TYPES, JOB_ROLES } from "@/lib/profileOptions";
 import { ProfileMeter } from "@/components/ProfileMeter";
 import { PushToggle } from "@/components/PushToggle";
 
@@ -39,7 +39,8 @@ export function Profile() {
     genders: string[];
     age_min: number | null;
     age_max: number | null;
-    jobs: string[];
+    jobTypes: string[];
+    jobRoles: string[];
     regions: string[];
     mbtis: string[];
   } | null>(null);
@@ -81,7 +82,8 @@ export function Profile() {
       const files = [...f.getAll("photos")].filter((x): x is File => x instanceof File && x.size > 0);
       const photos = files.length > 0 ? await uploadPhotos(files) : undefined;
       const body: Record<string, unknown> = {
-        job: f.get("job"),
+        job_type: f.get("job_type"),
+        job_role: f.get("job_role"),
         region: f.get("region"),
         mbti: f.get("mbti"),
         keywords: f.getAll("kw"),
@@ -109,7 +111,8 @@ export function Profile() {
           genders: f.getAll("pgender"),
           age_min: f.get("age_min"),
           age_max: f.get("age_max"),
-          jobs: f.getAll("jobs"),
+          job_types: f.getAll("job_types"),
+          job_roles: f.getAll("job_roles"),
           regions: f.getAll("regions"),
           mbtis: prefs?.mbtis ?? [], // 폼엔 없지만 기존 값 유지(빈 배열로 덮어쓰지 않도록)
           value_prefs: JSON.parse(String(f.get("value_prefs") || "{}")),
@@ -193,7 +196,9 @@ export function Profile() {
             </p>
             {isMember && (
               <p className="text-sm text-ink-soft">
-                {user.age ?? "?"}세 · {user.gender ?? ""} · {user.job ?? ""} · {user.region ?? ""}
+                {user.age ?? "?"}세 · {user.gender ?? ""}
+                {(user.jobType || user.jobRole) && ` · ${[user.jobType, user.jobRole].filter(Boolean).join(" ")}`}
+                {user.region ? ` · ${user.region}` : ""}
               </p>
             )}
             {isMember && (
@@ -229,9 +234,15 @@ export function Profile() {
         <form key={user.id} onSubmit={saveProfile} className="mt-6 rounded-2xl border border-line bg-white p-6 shadow-sm">
           <h3 className="mb-4 font-display font-semibold text-ink">프로필 수정</h3>
           <div className="mb-3">
-            <p className={labelCls}>직군 (선택)</p>
+            <p className={labelCls}>직장유형 (선택)</p>
             <div className="mt-1">
-              <ChipSelect name="job" options={JOB_CATEGORIES} defaultSelected={user.job ? [user.job] : []} placeholder="해당하는 직군을 하나 골라주세요." />
+              <ChipSelect name="job_type" options={JOB_TYPES} defaultSelected={user.jobType ? [user.jobType] : []} placeholder="어디서 일하는지 하나 골라주세요." />
+            </div>
+          </div>
+          <div className="mb-3">
+            <p className={labelCls}>직무 (선택)</p>
+            <div className="mt-1">
+              <ChipSelect name="job_role" options={JOB_ROLES} defaultSelected={user.jobRole ? [user.jobRole] : []} placeholder="무슨 일을 하는지 하나 골라주세요." />
             </div>
           </div>
           <div className="mb-3">
@@ -283,8 +294,12 @@ export function Profile() {
             <input name="age_max" type="number" placeholder="최대 나이" defaultValue={prefs?.age_max ?? ""} className={inputCls} />
           </div>
           <div className="mt-3">
-            <p className="mb-1 text-sm font-medium text-ink-soft">바라는 직군 (여러 개 가능)</p>
-            <ChipSelect name="jobs" options={JOB_CATEGORIES} multiple defaultSelected={prefs?.jobs ?? []} placeholder="비워두면 직군 제한 없음." />
+            <p className="mb-1 text-sm font-medium text-ink-soft">바라는 직장유형 (여러 개 가능)</p>
+            <ChipSelect name="job_types" options={JOB_TYPES} multiple defaultSelected={prefs?.jobTypes ?? []} placeholder="비워두면 직장유형 제한 없음." />
+          </div>
+          <div className="mt-3">
+            <p className="mb-1 text-sm font-medium text-ink-soft">바라는 직무 (여러 개 가능)</p>
+            <ChipSelect name="job_roles" options={JOB_ROLES} multiple defaultSelected={prefs?.jobRoles ?? []} placeholder="비워두면 직무 제한 없음." />
           </div>
           <div className="mt-3">
             <p className="mb-1 text-sm font-medium text-ink-soft">바라는 지역 (여러 개 가능)</p>

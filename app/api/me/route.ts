@@ -7,6 +7,7 @@ import { PHOTO_BUCKET } from "@/lib/constants";
 import { parseJsonArray, publicUserWithPhotos } from "@/lib/serialize";
 import { cleanKeywords } from "@/lib/keywords";
 import { cleanValues } from "@/lib/values";
+import { JOB_TYPES, JOB_ROLES } from "@/lib/profileOptions";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -50,9 +51,11 @@ export async function PUT(req: NextRequest) {
     if (body.gender && ["남성", "여성"].includes(String(body.gender))) sets.gender = String(body.gender);
     if (body.mbti !== undefined) sets.mbti = String(body.mbti).trim().toUpperCase() || null;
     // 연락처는 여기서 받지 않는다 — 매칭 수락 시에만 설정(사진 교환과 동일 원칙).
-    for (const f of ["job", "region"] as const) {
-      if (body[f] !== undefined) sets[f] = String(body[f]).trim() || null;
-    }
+    if (body.region !== undefined) sets.region = String(body.region).trim() || null;
+    if (body.job_type !== undefined)
+      sets.job_type = JOB_TYPES.includes(String(body.job_type) as never) ? String(body.job_type) : null;
+    if (body.job_role !== undefined)
+      sets.job_role = JOB_ROLES.includes(String(body.job_role) as never) ? String(body.job_role) : null;
     // 가치관 설문 — users.life_values(jsonb)
     if (body.values !== undefined) {
       const vals = cleanValues(body.values);

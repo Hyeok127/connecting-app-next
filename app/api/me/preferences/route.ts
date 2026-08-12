@@ -5,6 +5,7 @@ import { ok, fail, unauthorized, forbidden } from "@/lib/http";
 import { nowMs, parseArr } from "@/lib/utils";
 import { getPrefs } from "@/lib/matching";
 import { cleanValuePrefs, parseValuePrefs } from "@/lib/values";
+import { JOB_TYPES, JOB_ROLES } from "@/lib/profileOptions";
 
 export const runtime = "nodejs";
 
@@ -28,13 +29,14 @@ export async function PUT(req: NextRequest) {
   } catch {
     return fail("잘못된 요청입니다.", 400);
   }
-  // 하드 필터(성별/나이/직업/지역) + 바라는 가치관.
+  // 하드 필터(성별/나이/직장유형/직무/지역) + 바라는 가치관.
   const row = {
     user_id: user.id,
     genders: JSON.stringify(parseArr(body.genders).filter((g) => ["남성", "여성"].includes(g))),
     age_min: body.age_min ? Number(body.age_min) : null,
     age_max: body.age_max ? Number(body.age_max) : null,
-    jobs: JSON.stringify(parseArr(body.jobs)),
+    job_types: parseArr(body.job_types).filter((x) => JOB_TYPES.includes(x as never)),
+    job_roles: parseArr(body.job_roles).filter((x) => JOB_ROLES.includes(x as never)),
     value_prefs: cleanValuePrefs(body.value_prefs),
     regions: JSON.stringify(parseArr(body.regions)),
     mbtis: JSON.stringify(parseArr(body.mbtis)),

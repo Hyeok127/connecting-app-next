@@ -10,7 +10,9 @@ export interface PublicUser {
   name: string;
   gender: string | null;
   age: number | null;
-  job: string | null;
+  job: string | null; // 레거시(표시 폴백용)
+  jobType: string | null;
+  jobRole: string | null;
   region: string | null;
   mbti: string | null;
   keywords: string[];
@@ -38,6 +40,8 @@ export function publicUser(u: UserRow, opts: { photos?: boolean; contact?: boole
     gender: u.gender,
     age: u.age,
     job: u.job,
+    jobType: u.job_type,
+    jobRole: u.job_role,
     region: u.region,
     mbti: u.mbti,
     keywords: parseJsonArray(u.keywords),

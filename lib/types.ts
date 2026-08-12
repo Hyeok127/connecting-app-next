@@ -11,7 +11,10 @@ export interface UserRow {
   pin_hash: string;
   gender: string | null;
   age: number | null;
+  /** @deprecated 007에서 job_type/job_role로 분리 */
   job: string | null;
+  job_type: string | null; // 직장유형(대기업/스타트업 등)
+  job_role: string | null; // 직무(개발/디자인 등)
   /** @deprecated 005에서 life_values로 이관. 006에서 삭제 예정 */
   workplace: string | null;
   life_values: Record<string, string> | null; // 가치관(흡연/음주/문신/종교)
@@ -40,7 +43,9 @@ export interface User {
   is_admin: boolean;
   gender: string | null;
   age: number | null;
-  job: string | null;
+  job: string | null; // 레거시
+  jobType: string | null;
+  jobRole: string | null;
   region: string | null;
   mbti: string | null;
   keywords: string[] | null;
@@ -61,7 +66,10 @@ export interface PreferencesRow {
   genders: string;
   age_min: number | null;
   age_max: number | null;
+  /** @deprecated 007에서 job_types/job_roles로 분리 */
   jobs: string;
+  job_types: string[] | null; // 바라는 직장유형
+  job_roles: string[] | null; // 바라는 직무
   /** @deprecated 005에서 value_prefs로 이관. 006에서 삭제 예정 */
   workplaces: string;
   value_prefs: Record<string, string[]> | null; // 상대에게 바라는 가치관
