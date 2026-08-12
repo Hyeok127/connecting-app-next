@@ -17,25 +17,24 @@
 
 ---
 
-## 🛠 인프라 복구 (2026-08-12, 세션 말미)
+## 🛠 인프라 — WSL 상시 가동 (2026-08-12)
 
-**증상:** 다른 세션에서 nt9 진입점이 전부 끊김 — Tailscale offline, Tailnet SSH timeout, LAN SSH/WinRM 차단.
+**증상:** nt9의 WSL이 켜져 있어도 다른 세션에서 진입점이 전부 끊김 — Tailscale offline, Tailnet SSH timeout.
 
-**원인:** WSL 경량 VM이 유휴 시 완전히 종료됨(`.wslconfig` 부재 → 기본 유휴 타임아웃). WSL이 꺼지면 그 안의 tailscaled·SSH·3211 서버가 전부 같이 죽는다. 다른 세션이 접속을 시도한 순간 마침 꺼져 있었던 것.
+**근본 원인:** WSL2 경량 VM은 **붙어 있는 클라이언트 세션이 하나도 없으면 유휴 종료**된다(systemd·linger로 서비스가 돌아도 무관). VM이 꺼지면 그 안의 tailscaled·SSH·3211 서버가 전부 같이 죽는다. 1차 시도(`vmIdleTimeout=-1` + linger + 로그온 자동기동)는 두 허점이 있었다: (a) `.wslconfig`는 `wsl --shutdown` 후에만 적용되는데 재시작을 안 함, (b) 자동기동이 "로그온 시"에만 걸려 로그온 없이 꺼지면 못 살림.
 
-**조치 (모두 완료·검증):**
-1. `C:\Users\jshye\.wslconfig` 생성 → `[wsl2] vmIdleTimeout=-1` (유휴 자동종료 비활성화)
-2. `loginctl enable-linger jsh` → `Linger=yes` (세션 끊겨도 사용자 서비스 유지). `wsl -u root`로 sudo 우회
-3. `systemctl enable tailscaled` (부팅 자동시작)
-4. `systemctl --user enable --now connecting-preview.service` (3211 서버 상주, `Restart=always`)
-5. Windows 예약 작업 `WSL-Ubuntu-AutoStart` — 로그온 시 `wsl -d Ubuntu -u root -- true`로 WSL 기동 (실행 검증: `LastTaskResult 0`)
+**최종 조치 (anchor 방식, 검증 완료):**
+1. `C:\Users\jshye\.wslconfig` → `[wsl2] vmIdleTimeout=-1`
+2. `loginctl enable-linger jsh` → `Linger=yes` (배포 부팅 시 tailscaled·connecting-preview 자동 기동)
+3. `systemctl enable tailscaled` (system) + `connecting-preview.service` (user, `Restart=always`, 3211)
+4. **핵심 — anchor 세션**: `C:\Users\jshye\wsl-keepalive.ps1`이 WSL 안에 `sleep infinity` 세션을 상주시킨다. 클라이언트가 붙어 있으면 VM은 절대 유휴 종료되지 않는다.
+5. **예약 작업 `WSL-KeepAlive`** — 로그온 시 + **5분마다** keepalive 실행. VM이 꺼져 있으면 부팅하며 anchor 부착, anchor가 죽었으면 재부착. (기존 `WSL-Ubuntu-AutoStart`는 교체·삭제)
 
-**검증:** Tailscale `Running`/`Online: True` (100.125.135.35), 3211 응답 200, SSH 22번 리슨 확인.
+**검증:** `wsl --shutdown`으로 강제 종료(`Stopped`) → keepalive 실행 → 자동 복구. Tailscale `Running`/`Online: True` (100.125.135.35), tailscaled·connecting-preview `active`, `/api/health` `status:ok`, anchor 존재 확인.
 
-**남은 인프라 참고:**
-- Windows **재부팅**이 아니라 **로그오프/재로그온** 시엔 예약 작업이 WSL을 깨움. 다만 로그온 후에도 실제 기동까지 수 초 걸릴 수 있음
-- LAN 주소(`192.168.45.253`)의 SSH·WinRM 차단은 **손대지 않음** — Windows 방화벽 원격관리 포트를 여는 건 보안 영향이 있는 별개 결정. Tailscale 경로로 충분
-- nt9 → 타 노드 SSH는 여전히 `Permission denied (publickey)` (nt9 발신 키 미배포)
+**남은 한 가지 (다음에 nt9에서 직접):**
+- 현재 keepalive는 **사용자가 로그인해 있을 때만** 동작(관리자 권한 없이 만든 작업). 로그아웃/절전 상태에서도 유지하려면 작업을 관리자 권한 + "사용자 로그온 여부와 무관하게 실행"으로 재설정 필요.
+- (참고) LAN `192.168.45.253` SSH/WinRM 차단은 미조치(방화벽 보안 결정). nt9→타 노드 SSH는 여전히 `Permission denied (publickey)`.
 
 ---
 
