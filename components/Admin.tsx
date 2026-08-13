@@ -74,6 +74,37 @@ interface MatchData {
   summary: { pending: number; accepted: number; rejected: number; expired: number; active_meetings: number; total: number };
 }
 
+interface Dashboard {
+  cycle: string;
+  participants: {
+    members: number;
+    bridges: number;
+    by_status: Record<string, number>;
+    by_gender: Record<string, number>;
+    with_photos: number;
+    with_prefs: number;
+    with_email: number;
+  };
+  today: {
+    cycle: string;
+    confirmed_rankers: number;
+    rankable_pool: number;
+    pending_batch_pairs: number;
+    matches: number;
+    matches_by_state: Record<string, number>;
+  };
+  matching: {
+    total_matches: number;
+    by_state: Record<string, number>;
+    active_meetings: number;
+    closed_meetings: number;
+    dating_users: number;
+    paused_users: number;
+  };
+  funnel: { rankers: number; matches: number; accepted: number; meetings: number; couples: number };
+  bridges: { name: string; invited: number; points: number }[];
+}
+
 const STATE_LABEL: Record<string, string> = { pending: "대기", accepted: "성사", rejected: "거절", expired: "만료" };
 const STATE_STYLE: Record<string, string> = {
   pending: "bg-gold-100/60 text-gold-600 border-gold-100",
@@ -85,26 +116,29 @@ const RESP: Record<string, string> = { pending: "…", accept: "✓", reject: "�
 
 export function Admin() {
   const toast = useToast();
-  const [tab, setTab] = useState<"users" | "matches">("users");
+  const [tab, setTab] = useState<"dashboard" | "users" | "matches">("dashboard");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [health, setHealth] = useState<Health | null>(null);
   const [matchData, setMatchData] = useState<MatchData | null>(null);
+  const [dash, setDash] = useState<Dashboard | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [u, r, h, m] = await Promise.all([
+      const [u, r, h, m, d] = await Promise.all([
         api<{ users: AdminUser[] }>("/admin/users"),
         api<{ reports: AdminReport[] }>("/admin/reports"),
         api<Health>("/health").catch(() => null),
         api<MatchData>("/admin/matches").catch(() => null),
+        api<{ dashboard: Dashboard }>("/admin/dashboard").then((x) => x.dashboard).catch(() => null),
       ]);
       setUsers(u.users);
       setReports(r.reports);
       setHealth(h);
       setMatchData(m);
+      setDash(d);
     } finally {
       setLoading(false);
     }
@@ -193,16 +227,19 @@ export function Admin() {
 
       {/* 탭 */}
       <div className="mb-4 flex gap-1 rounded-full bg-cream p-1">
-        {(["users", "matches"] as const).map((t) => (
+        {(["dashboard", "users", "matches"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`flex-1 rounded-full py-2 text-sm font-medium transition ${tab === t ? "bg-white text-ink shadow-sm" : "text-ink-faint hover:text-ink-soft"}`}
           >
-            {t === "users" ? `회원 (${users.length})` : `매칭 현황 (${matchData?.summary.total ?? 0})`}
+            {t === "dashboard" ? "대시보드" : t === "users" ? `회원 (${users.length})` : `매칭 현황 (${matchData?.summary.total ?? 0})`}
           </button>
         ))}
       </div>
+
+      {tab === "dashboard" && dash && <DashboardPanel d={dash} />}
+      {tab === "dashboard" && !dash && <Empty>대시보드를 불러오지 못했습니다. (009 마이그레이션 적용 필요)</Empty>}
 
       {tab === "users" && (
         <>
@@ -338,4 +375,126 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function Muted({ children }: { children?: React.ReactNode }) {
   return <span className="text-xs text-ink-faint/60">{children ?? "없음"}</span>;
+}
+
+// ── 대시보드 ──
+function Stat({ label, value, sub, accent }: { label: string; value: React.ReactNode; sub?: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-3 ${accent ? "border-wine-100 bg-wine-50" : "border-line bg-white"}`}>
+      <div className={`font-display text-2xl font-bold ${accent ? "text-wine-700" : "text-ink"}`}>{value}</div>
+      <div className="text-xs text-ink-faint">{label}</div>
+      {sub && <div className="mt-0.5 text-[11px] text-ink-faint/70">{sub}</div>}
+    </div>
+  );
+}
+
+const STATE_KO: Record<string, string> = { active: "활동", match_pending: "매칭대기", dating: "만남중", paused: "휴면(교제)", suspended: "정지", pending: "대기", accepted: "성사", rejected: "거절", expired: "만료" };
+
+function Chips({ obj }: { obj: Record<string, number> }) {
+  const entries = Object.entries(obj);
+  if (!entries.length) return <span className="text-xs text-ink-faint/60">없음</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {entries.map(([k, v]) => (
+        <span key={k} className="rounded-full border border-line bg-cream px-2.5 py-0.5 text-xs text-ink-soft">
+          {STATE_KO[k] ?? k} <strong className="text-ink">{v}</strong>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DashboardPanel({ d }: { d: Dashboard }) {
+  const pct = (n: number, base: number) => (base > 0 ? Math.round((n / base) * 100) : 0);
+  const f = d.funnel;
+  const steps: [string, number, number | null][] = [
+    ["순위 확정자", f.rankers, null],
+    ["매칭 생성", f.matches, f.rankers],
+    ["성사(쌍방수락)", f.accepted, f.matches],
+    ["만남 시작", f.meetings, f.accepted],
+    ["교제 시작", f.couples, f.meetings],
+  ];
+  const maxF = Math.max(1, f.rankers, f.matches, f.accepted, f.meetings, f.couples);
+
+  return (
+    <div className="space-y-6">
+      {/* 참가자 */}
+      <section>
+        <h3 className="mb-2 font-display font-semibold text-ink">참가자</h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="일반 회원" value={d.participants.members} accent />
+          <Stat label="주선자" value={d.participants.bridges} />
+          <Stat label="사진 등록" value={d.participants.with_photos} sub={`${pct(d.participants.with_photos, d.participants.members)}%`} />
+          <Stat label="선호 설정" value={d.participants.with_prefs} sub={`${pct(d.participants.with_prefs, d.participants.members)}%`} />
+        </div>
+        <div className="mt-2 space-y-1.5 text-xs">
+          <div className="flex gap-2"><span className="w-14 shrink-0 text-ink-faint">상태</span><Chips obj={d.participants.by_status} /></div>
+          <div className="flex gap-2"><span className="w-14 shrink-0 text-ink-faint">성별</span><Chips obj={d.participants.by_gender} /></div>
+        </div>
+      </section>
+
+      {/* 오늘 추천/배치 예정 */}
+      <section>
+        <h3 className="mb-1 font-display font-semibold text-ink">오늘의 추천·배치 ({d.today.cycle})</h3>
+        <p className="mb-2 text-xs text-ink-faint">밤 8시 배치가 돌면 아래 &lsquo;예정 매칭&rsquo;만큼 매칭이 생깁니다.</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="순위 확정자" value={d.today.confirmed_rankers} />
+          <Stat label="추천 가능 풀" value={d.today.rankable_pool} sub="active 회원" />
+          <Stat label="예정 매칭(쌍)" value={d.today.pending_batch_pairs} accent sub="다음 배치 시" />
+          <Stat label="오늘 생성된 매칭" value={d.today.matches} />
+        </div>
+        {Object.keys(d.today.matches_by_state).length > 0 && (
+          <div className="mt-2 flex gap-2 text-xs"><span className="w-14 shrink-0 text-ink-faint">오늘 상태</span><Chips obj={d.today.matches_by_state} /></div>
+        )}
+      </section>
+
+      {/* 매칭 단계 */}
+      <section>
+        <h3 className="mb-2 font-display font-semibold text-ink">매칭 단계 (누적)</h3>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Stat label="총 매칭" value={d.matching.total_matches} />
+          <Stat label="진행 중 만남" value={d.matching.active_meetings} accent />
+          <Stat label="만남 중(dating)" value={d.matching.dating_users} />
+          <Stat label="교제 휴면(paused)" value={d.matching.paused_users} />
+        </div>
+        <div className="mt-2 flex gap-2 text-xs"><span className="w-14 shrink-0 text-ink-faint">매칭 상태</span><Chips obj={d.matching.by_state} /></div>
+      </section>
+
+      {/* 퍼널 */}
+      <section>
+        <h3 className="mb-1 font-display font-semibold text-ink">전환 퍼널</h3>
+        <p className="mb-3 text-xs text-ink-faint">각 단계로 얼마나 넘어가는지 — 추천·매칭 개선의 기준 지표.</p>
+        <div className="space-y-2">
+          {steps.map(([label, n, base]) => (
+            <div key={label} className="flex items-center gap-3">
+              <span className="w-24 shrink-0 text-xs text-ink-soft">{label}</span>
+              <div className="h-5 flex-1 overflow-hidden rounded bg-cream">
+                <div className="flex h-full items-center justify-end rounded bg-wine-500 px-2 text-[11px] font-medium text-paper" style={{ width: `${Math.max(6, (n / maxF) * 100)}%` }}>
+                  {n}
+                </div>
+              </div>
+              <span className="w-12 shrink-0 text-right text-xs text-ink-faint">{base != null ? `${pct(n, base)}%` : ""}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 주선자 */}
+      <section>
+        <h3 className="mb-2 font-display font-semibold text-ink">주선자 현황</h3>
+        {d.bridges.length === 0 ? (
+          <Empty>주선자가 없습니다.</Empty>
+        ) : (
+          <div className="space-y-1.5">
+            {d.bridges.map((b) => (
+              <div key={b.name} className="flex items-center justify-between rounded-xl border border-line bg-white px-3 py-2 text-sm">
+                <strong className="text-ink">{b.name}</strong>
+                <span className="text-xs text-ink-faint">초대 {b.invited}명 · 포인트 {b.points}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
