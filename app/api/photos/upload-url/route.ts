@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
     return fail("jpg, png, webp, gif 만 업로드 가능합니다.", 400);
 
   try {
-    const { objectPath, uploadUrl } = await createSignedUploadUrl(user.id, ext);
-    return ok({ objectPath, uploadUrl });
+    const { objectPath, uploadUrl, contentType } = await createSignedUploadUrl(user.id, ext);
+    return ok({ objectPath, uploadUrl, contentType });
   } catch (e) {
     return fail((e as Error).message, 400);
   }

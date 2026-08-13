@@ -3,6 +3,7 @@ import type { UserRow } from "@/lib/types";
 import { PHOTO_BUCKET } from "@/lib/constants";
 import { getSupabase } from "@/lib/supabase";
 import { parseValues } from "@/lib/values";
+import { r2Enabled, r2SignedGetUrl } from "@/lib/r2";
 
 export interface PublicUser {
   id: string;
@@ -56,6 +57,7 @@ export function publicUser(u: UserRow, opts: { photos?: boolean; contact?: boole
 
 export async function signedPhotoUrls(paths: string[], expiresIn = 3600): Promise<string[]> {
   if (paths.length === 0) return [];
+  if (r2Enabled()) return Promise.all(paths.map((p) => r2SignedGetUrl(p, expiresIn)));
   const sb = getSupabase();
   const out: string[] = [];
   for (const p of paths) {

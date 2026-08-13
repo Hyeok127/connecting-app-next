@@ -8,13 +8,14 @@ export function extFromName(name: string): string {
 }
 
 export async function uploadPhoto(file: File): Promise<string> {
-  const { objectPath, uploadUrl } = await api<{ objectPath: string; uploadUrl: string }>(
+  const { objectPath, uploadUrl, contentType } = await api<{ objectPath: string; uploadUrl: string; contentType: string }>(
     "/photos/upload-url",
     { method: "POST", body: JSON.stringify({ ext: extFromName(file.name) }) }
   );
+  // 서버가 서명한 것과 동일한 Content-Type으로 보내야 R2 presigned 서명이 일치한다.
   const res = await fetch(uploadUrl, {
     method: "PUT",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
+    headers: { "Content-Type": contentType || file.type || "application/octet-stream" },
     body: file,
   });
   if (!res.ok) throw new Error("사진 업로드에 실패했습니다.");

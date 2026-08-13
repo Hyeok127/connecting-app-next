@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authFromToken, bearerToken, getUserById } from "@/lib/auth";
 import { ok, fail, unauthorized } from "@/lib/http";
 import { parseArr, PHOTO_PATH_RE } from "@/lib/utils";
-import { PHOTO_BUCKET } from "@/lib/constants";
+import { removePhotos } from "@/lib/storage";
 import { parseJsonArray, publicUserWithPhotos } from "@/lib/serialize";
 import { cleanKeywords } from "@/lib/keywords";
 import { cleanValues } from "@/lib/values";
@@ -74,7 +74,7 @@ export async function PUT(req: NextRequest) {
       sets.photos = JSON.stringify(photos);
       // 이전 사진 정리 (best-effort)
       if (oldPaths.length) {
-        await sb.storage.from(PHOTO_BUCKET).remove(oldPaths).catch(() => {});
+        await removePhotos(oldPaths);
       }
     }
   } else {
@@ -106,7 +106,7 @@ export async function DELETE(req: NextRequest) {
   const id = user.id;
   // 내 사진 정리
   const myPhotos = parseJsonArray(user.photos);
-  if (myPhotos.length) await sb.storage.from(PHOTO_BUCKET).remove(myPhotos).catch(() => {});
+  if (myPhotos.length) await removePhotos(myPhotos);
 
   // 나와 관련된 매칭/만남/피드백 정리(FK 안전 순서)
   const { data: myMatches } = await sb
