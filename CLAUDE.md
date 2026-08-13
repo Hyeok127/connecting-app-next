@@ -139,6 +139,7 @@ Supabase 프로젝트가 두 개다. **둘 다 같은 조직(Hyeok127's Org) 안
     사진 없이 동의 시도 400 거부 → 클라우드 Storage에 사진 등록 후 A만 동의 시 상대 미노출
     → 쌍방 동의 시 상대 photos 응답 포함 + **그 서명 URL로 실제 사진 HTTP 200 도달**.
     즉 "쌍방 동의→실제 사진 전달" 긍정 경로가 라이브 클라우드에서 끝까지 실동작 확인됨.
+  - **이후 갱신(2026-08-13)**: Management API로 DDL이 가능해져 위 DDL-free 저장을 정규 스키마로 이관했다(005). 사진 동의는 이제 `point_events`가 아니라 **`photo_consents(match_id, user_id)` 테이블**에 기록된다. 사진 파일 저장소도 Supabase Storage → **Cloudflare R2**로 전환(위 "환경변수" 참조). 동의→서명 URL→실제 전달의 개인정보 흐름 자체는 동일하며, 검증도 R2에서 재확인됨.
     (스크립트: scratchpad/cloud_stage2.mjs, dev 서버 3210 경유 실 API 호출)
 - **연락처**: 가입 시 받지 않는다. 매칭 수락 시에만 입력받고, 성사된 상대에게만 공개(기존 R11/R12 유지).
 - **근무지(workplace)**: 수집 UI 전부 제거(가입·프로필·선호조건). 스키마/서버 필드는 남아
@@ -190,15 +191,25 @@ Supabase 프로젝트가 두 개다. **둘 다 같은 조직(Hyeok127's Org) 안
 
 ## 환경변수
 
-`.env.local`(gitignore)에 3개가 필요하다. 키 설명은 `.env.example` 참조.
+`.env.local`(gitignore)에 다음이 필요하다. 키 설명은 `.env.example` 참조.
 
+**앱 실행 필수**
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` — **RLS를 우회하는 전권 키.** 서버 코드에서만 쓴다
 - `CRON_SECRET` — Vercel Cron 인증용
 
-`VERCEL_OIDC_TOKEN`이 파일에 들어 있을 수 있는데 vercel CLI가 자동 생성하는 단기 토큰이라
-기기 간에 옮길 필요가 없다. 새 기기 세팅 시엔 기존 기기에서 `.env.local`을 복사한다
-(tailnet scp). 값은 Vercel 프로젝트 환경변수에도 동일하게 들어가 있어야 한다.
+**사진 저장소 = Cloudflare R2** (2026-08-13 전환). 아래 4개가 있으면 R2, 없으면 Supabase Storage로 자동 폴백(`lib/r2.ts` `r2Enabled()`). 개인정보 방식 동일(비공개 버킷 + 시간제한 presigned URL).
+- `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET`(=`connectingbucket`)
+- 코드 경로: 업로드는 `lib/storage.ts createSignedUploadUrl`(presigned PUT), 조회는 `lib/serialize.ts signedPhotoUrls`(presigned GET), 삭제는 `storage.ts removePhotos`. 클라이언트는 서버가 서명한 `contentType`과 동일 헤더로 PUT해야 서명이 일치한다(`lib/upload.ts`).
+- **dev·prod 모두 R2 활성** — 두 환경이 같은 버킷 `connectingbucket`을 공유한다.
+
+**운영 자동화 토큰** (앱 실행엔 불필요, 관리 작업용)
+- `SUPABASE_ACCESS_TOKEN`(sbp_) — Management API로 DDL 실행. `scripts/apply_migration.mjs`, `scripts/sql.mjs`
+- `VERCEL_TOKEN`(vcp_) — **Vercel 환경변수·배포를 API로 직접 조작.** `scripts/vercel_env.mjs`(프로젝트 자동 탐색 후 env 등록). 프로젝트 `prj_nZuBRbLx5wBQdQH8c6pbWXpI5eZx`, scope=personal
+  - 예: env 등록 후 `main`에 커밋 push하면 GitHub 연동으로 재배포되어 새 env가 적용된다
+- `VERCEL_OIDC_TOKEN`은 vercel CLI가 자동 생성하는 단기 토큰이라 기기 간 이동 불필요
+
+새 기기 세팅 시 기존 기기에서 `.env.local`을 복사한다(tailnet scp). **앱 실행 필수 + R2 값은 Vercel 프로젝트 환경변수에도 동일하게** 들어가 있어야 한다(운영 자동화 토큰은 nt9 로컬에만 두면 됨).
 
 ## 개발·검증
 
