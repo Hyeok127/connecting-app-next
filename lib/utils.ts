@@ -7,8 +7,15 @@ export const nowMs = () => Date.now();
 export const genId = () => crypto.randomBytes(8).toString("hex");
 
 // KST 기준 사이클 날짜 'YYYY-MM-DD' (R18)
-export const cycleDate = (offsetDays = 0) =>
-  new Date(Date.now() + 9 * 3600e3 + offsetDays * 86400e3).toISOString().slice(0, 10);
+// 개발 전용 테스트 훅: CYCLE_OVERRIDE(YYYY-MM-DD)가 설정되면 그 날짜를 "오늘"로 취급한다.
+// → 3일 시나리오처럼 여러 날을 하루에 시뮬레이션할 때 사용. 운영엔 이 env가 없어 무영향.
+export const cycleDate = (offsetDays = 0) => {
+  const ov = process.env.CYCLE_OVERRIDE;
+  if (ov && /^\d{4}-\d{2}-\d{2}$/.test(ov)) {
+    return new Date(new Date(ov + "T00:00:00Z").getTime() + offsetDays * 86400e3).toISOString().slice(0, 10);
+  }
+  return new Date(Date.now() + 9 * 3600e3 + offsetDays * 86400e3).toISOString().slice(0, 10);
+};
 
 export function parseArr(v: unknown): string[] {
   if (v == null) return [];

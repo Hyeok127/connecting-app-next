@@ -14,7 +14,11 @@ if (!sqlPath) {
   process.exit(1);
 }
 
-const token = process.env.SUPABASE_ACCESS_TOKEN;
+const token =
+  process.env.SUPABASE_ACCESS_TOKEN ||
+  (fs.existsSync(".env.local")
+    ? (fs.readFileSync(".env.local", "utf8").match(/^SUPABASE_ACCESS_TOKEN=(.+)$/m) ?? [])[1]?.trim()
+    : null);
 if (!token) {
   console.error("SUPABASE_ACCESS_TOKEN 환경변수가 필요합니다 (sbp_로 시작).");
   console.error("발급: https://supabase.com/dashboard/account/tokens");

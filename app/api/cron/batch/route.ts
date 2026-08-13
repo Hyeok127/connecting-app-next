@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
     return fail("Forbidden", 403);
 
   try {
-    const result = await runBatch();
     const cycle = cycleDate();
+    const result = await runBatch(cycle);
     // 새 매칭 알림(best-effort): 이메일 + 웹푸시
     await Promise.all([
       notifyMatchesForCycle(getSupabase(), cycle).catch(() => {}),

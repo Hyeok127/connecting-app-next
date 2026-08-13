@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
   if (!admin) return unauthorized();
   if (!admin.is_admin) return forbidden("관리자만 사용할 수 있습니다."); // R25
   try {
-    const result = await runBatch();
     const cycle = cycleDate();
+    const result = await runBatch(cycle);
     // 이번 사이클에 생성된 매칭 당사자에게 "새 매칭 도착" 알림(이메일 + 웹푸시, best-effort)
     await Promise.all([
       notifyMatchesForCycle(getSupabase(), cycle).catch(() => {}),
