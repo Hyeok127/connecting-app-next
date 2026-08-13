@@ -38,6 +38,31 @@
 
 ---
 
+## 🧱 인프라 스택 (전부 무료 티어)
+
+| 계층 | 서비스 | 용도 | 비고 |
+|---|---|---|---|
+| 웹/서버 | **Vercel** (Hobby) | Next.js 호스팅 + 서버리스 함수 + Cron | 무료는 비상업용 전제. 수익화 시 Pro 필요 |
+| DB | **Supabase** Postgres | 텍스트 데이터 전부 | 무료 500MB (현재 운영 11MB≈2%). 텍스트라 수만 명까지 여유 |
+| 사진 | **Cloudflare R2** | 프로필 사진 파일 | 무료 10GB + **다운로드 평생 무료**. 비공개 버킷 + 시간제한 서명 URL |
+| 알림 | 앱 내 배지 + 웹푸시 | 매칭 알림 | 외부 가입 불필요. 이메일(Resend)은 휴면 |
+| 내부망 | **Tailscale** | 개발 서버를 폰/타기기에서 접근 | `100.125.135.35` |
+
+### 사진 저장소 = Cloudflare R2 (2026-08-13 전환, `b75805d`~)
+
+- **왜:** Supabase Storage 무료 1GB로는 사진 ~300명분이면 참. R2는 10GB + 다운로드 무료라 병목 해소.
+- **구현:** `lib/r2.ts`(S3 호환 SDK, presigned PUT/GET/삭제). `storage.ts`/`serialize.ts`가 **R2_* env 있으면 R2, 없으면 Supabase Storage로 자동 폴백**(이중 모드). 개인정보 방식 동일 — 비공개 버킷 + 시간제한 서명 URL, 매칭 동의 후에만 공개.
+- **적용 상태:** 개발(nt9 `.env.local`) + **프로덕션(Vercel 환경변수)** 모두 R2 활성. 실제 업로드→조회→탈퇴삭제 dev/prod 양쪽 검증 완료.
+- **버킷:** `connectingbucket` (Cloudflare 계정 `84746a2d...`).
+- **환경변수(4개):** `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET`. Vercel엔 `scripts/vercel_env.mjs`로 등록함(재사용 가능).
+- **자격증명 관리:** nt9 `.env.local`에 `SUPABASE_ACCESS_TOKEN`, `VERCEL_TOKEN`, `R2_*` 보관. **`VERCEL_TOKEN`으로 이제 환경변수·배포를 API로 직접 조작 가능**(`scripts/vercel_env.mjs`). ⚠️ R2·Vercel 토큰이 채팅에 노출된 이력 있음 — 사용자가 교체 보류 결정.
+
+### 다음 인프라 후보 (미적용)
+- **DB 백업** — Supabase 무료엔 자동 백업 없음. DB 유실 대비 필요(가장 시급). Management API로 매일 덤프 스크립트 가능.
+- **에러·업타임 모니터링** — `/api/health`에 외부 감시 연결 + Sentry.
+
+---
+
 ## ✅ 완료된 작업
 
 ### 1. 기능 개선 11건 (`149b165`)
@@ -183,7 +208,7 @@ node scripts/inspect_db.mjs .env.local.prod.bak              # RLS·인덱스·�
 | 중 | **초대 코드 무제한** | 만료 없음, 인당 상한 없음. 한 사람이 다수 계정을 만들어 추천 풀을 채울 수 있음(초대자 포인트도 누적) |
 | 중 | **세션 위생** | TTL 30일 + `localStorage` 저장(XSS로 읽힘). httpOnly 쿠키 미적용 |
 | 하 | 탈퇴 보호 없음 | PIN 재확인·속도 제한 없이 토큰만으로 계정 영구 삭제 가능 |
-| 하 | 고아 사진 미정리 | 업로드했지만 프로필에 연결되지 않은 객체가 영구히 남음 |
+| 하 | 고아 사진 미정리 | 업로드했지만 프로필에 연결되지 않은 객체가 R2/저장소에 영구히 남음(주기적 청소 없음) |
 | 하 | `paused` 탈출 수단 없음 | 교제 시작 후 헤어져도 복귀 방법이 없음(관리자 unpause 기능 부재) |
 
 ### B. 운영·모니터링
@@ -219,7 +244,11 @@ node scripts/inspect_db.mjs .env.local.prod.bak              # RLS·인덱스·�
 | DB | ref | 회원 수 |
 |---|---|---|
 | 운영 | `pcoxykeecgfrdbhynnae` | 3명 |
-| 개발 | `vnwkxkopnpyhabjfclpb` | 174명 |
+| 개발 | `vnwkxkopnpyhabjfclpb` | 220명 |
+
+| 저장소 | 서비스 | 비고 |
+|---|---|---|
+| 사진 | Cloudflare R2 버킷 `connectingbucket` | dev·prod 공용. 무료 10GB (현재 거의 빔) |
 
 ---
 
