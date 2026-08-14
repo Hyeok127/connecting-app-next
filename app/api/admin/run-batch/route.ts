@@ -6,6 +6,7 @@ import { runBatch } from "@/lib/batch";
 import { cycleDate } from "@/lib/utils";
 import { notifyMatchesForCycle } from "@/lib/notify";
 import { pushMatchesForCycle } from "@/lib/push";
+import { recordMatchFeatures, takeSnapshot } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,11 +18,12 @@ export async function POST(req: NextRequest) {
   try {
     const cycle = cycleDate();
     const result = await runBatch(cycle);
-    // 이번 사이클에 생성된 매칭 당사자에게 "새 매칭 도착" 알림(이메일 + 웹푸시, best-effort)
+    await recordMatchFeatures(cycle).catch(() => {}); // 성사요인 기록
     await Promise.all([
       notifyMatchesForCycle(getSupabase(), cycle).catch(() => {}),
       pushMatchesForCycle(cycle).catch(() => {}),
     ]);
+    await takeSnapshot(cycle, "auto").catch(() => {}); // 배치 후 자동 스냅샷
     return ok({ ok: true, cycle, result });
   } catch (e) {
     return fail((e as Error).message, 400);

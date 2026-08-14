@@ -1,8 +1,22 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { api } from "@/lib/api";
 import { Avatar, Badge, KeywordChips, ValueChips, TrustBadge, Spinner, Empty } from "@/components/ui";
+
+interface Snapshot {
+  taken_at: number;
+  cycle: string;
+  label: string;
+  members: number;
+  total_matches: number;
+  accepted: number;
+  couples: number;
+  active_meetings: number;
+  pending_pairs: number;
+}
 
 interface AdminUser {
   id: string;
@@ -116,33 +130,52 @@ const RESP: Record<string, string> = { pending: "…", accept: "✓", reject: "�
 
 export function Admin() {
   const toast = useToast();
-  const [tab, setTab] = useState<"dashboard" | "users" | "matches">("dashboard");
+  const { logout } = useAuth();
+  const router = useRouter();
+  const [tab, setTab] = useState<"dashboard" | "trend" | "users" | "matches">("dashboard");
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [health, setHealth] = useState<Health | null>(null);
   const [matchData, setMatchData] = useState<MatchData | null>(null);
   const [dash, setDash] = useState<Dashboard | null>(null);
+  const [snaps, setSnaps] = useState<Snapshot[]>([]);
+  const [snapBusy, setSnapBusy] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [u, r, h, m, d] = await Promise.all([
+      const [u, r, h, m, d, s] = await Promise.all([
         api<{ users: AdminUser[] }>("/admin/users"),
         api<{ reports: AdminReport[] }>("/admin/reports"),
         api<Health>("/health").catch(() => null),
         api<MatchData>("/admin/matches").catch(() => null),
         api<{ dashboard: Dashboard }>("/admin/dashboard").then((x) => x.dashboard).catch(() => null),
+        api<{ snapshots: Snapshot[] }>("/admin/snapshot").then((x) => x.snapshots).catch(() => []),
       ]);
       setUsers(u.users);
       setReports(r.reports);
       setHealth(h);
       setMatchData(m);
       setDash(d);
+      setSnaps(s);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const takeSnapshot = async () => {
+    setSnapBusy(true);
+    try {
+      await api("/admin/snapshot", { method: "POST" });
+      toast("스냅샷을 기록했어요.");
+      load().catch(() => {});
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setSnapBusy(false);
+    }
+  };
 
   const showErr = useCallback((e: unknown) => toast((e as Error).message), [toast]);
 
@@ -184,12 +217,33 @@ export function Admin() {
   const memberCount = users.filter((u) => u.role === "member").length;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="min-h-screen bg-cream/30">
+      {/* 운영 콘솔 자체 헤더 */}
+      <div className="sticky top-0 z-40 border-b border-line bg-ink text-paper">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+          <span className="font-display text-sm font-bold tracking-wide">⚙ 운영 콘솔</span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => router.push("/home")} className="rounded-full border border-paper/30 px-3 py-1 text-xs text-paper/90 transition hover:bg-paper/10">
+              앱으로
+            </button>
+            <button onClick={async () => { await logout(); router.push("/"); }} className="rounded-full border border-paper/30 px-3 py-1 text-xs text-paper/90 transition hover:bg-paper/10">
+              로그아웃
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-3xl px-4 py-6">
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="font-display text-xl font-bold tracking-tight text-ink">관리자</h2>
-        <button onClick={runBatch} className="rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85">
-          수동 배치 실행
-        </button>
+        <h2 className="font-display text-xl font-bold tracking-tight text-ink">모니터링</h2>
+        <div className="flex gap-2">
+          <button onClick={takeSnapshot} disabled={snapBusy} className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-medium text-ink-soft transition hover:bg-cream disabled:opacity-40">
+            {snapBusy ? "기록 중..." : "스냅샷 찍기"}
+          </button>
+          <button onClick={runBatch} className="rounded-xl bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink/85">
+            수동 배치 실행
+          </button>
+        </div>
       </div>
 
       {/* 배치/상태 요약 */}
@@ -227,19 +281,20 @@ export function Admin() {
 
       {/* 탭 */}
       <div className="mb-4 flex gap-1 rounded-full bg-cream p-1">
-        {(["dashboard", "users", "matches"] as const).map((t) => (
+        {(["dashboard", "trend", "users", "matches"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`flex-1 rounded-full py-2 text-sm font-medium transition ${tab === t ? "bg-white text-ink shadow-sm" : "text-ink-faint hover:text-ink-soft"}`}
           >
-            {t === "dashboard" ? "대시보드" : t === "users" ? `회원 (${users.length})` : `매칭 현황 (${matchData?.summary.total ?? 0})`}
+            {t === "dashboard" ? "대시보드" : t === "trend" ? `변화 추이 (${snaps.length})` : t === "users" ? `회원 (${users.length})` : `매칭 (${matchData?.summary.total ?? 0})`}
           </button>
         ))}
       </div>
 
       {tab === "dashboard" && dash && <DashboardPanel d={dash} />}
-      {tab === "dashboard" && !dash && <Empty>대시보드를 불러오지 못했습니다. (009 마이그레이션 적용 필요)</Empty>}
+      {tab === "dashboard" && !dash && <Empty>대시보드를 불러오지 못했습니다.</Empty>}
+      {tab === "trend" && <TrendPanel snaps={snaps} />}
 
       {tab === "users" && (
         <>
@@ -360,6 +415,95 @@ export function Admin() {
           )}
         </>
       )}
+      </div>
+    </div>
+  );
+}
+
+// ── 변화 추이(스냅샷) ──
+function TrendPanel({ snaps }: { snaps: Snapshot[] }) {
+  if (snaps.length === 0)
+    return (
+      <div>
+        <p className="mb-3 text-xs text-ink-faint">아직 스냅샷이 없습니다. 배치가 돌 때 자동 기록되고, 위 &lsquo;스냅샷 찍기&rsquo;로 지금 시점을 남길 수 있어요.</p>
+        <Empty>스냅샷을 찍으면 여기에 시점별 변화가 쌓입니다.</Empty>
+      </div>
+    );
+
+  const metrics: [string, keyof Snapshot, string][] = [
+    ["회원", "members", "text-ink"],
+    ["총 매칭", "total_matches", "text-wine-700"],
+    ["성사", "accepted", "text-emerald-600"],
+    ["교제", "couples", "text-gold-600"],
+  ];
+  const first = snaps[0], last = snaps[snaps.length - 1];
+  const delta = (k: keyof Snapshot) => Number(last[k]) - Number(first[k]);
+
+  return (
+    <div className="space-y-5">
+      <p className="text-xs text-ink-faint">시점별 스냅샷 {snaps.length}개 · {new Date(first.taken_at).toLocaleString("ko-KR")} → {new Date(last.taken_at).toLocaleString("ko-KR")}</p>
+
+      {/* 처음→지금 누적 변화 */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {metrics.map(([label, key, color]) => (
+          <div key={label} className="rounded-xl border border-line bg-white p-3">
+            <div className={`font-display text-2xl font-bold ${color}`}>{Number(last[key])}</div>
+            <div className="text-xs text-ink-faint">{label}</div>
+            <div className={`mt-0.5 text-[11px] ${delta(key) > 0 ? "text-emerald-600" : "text-ink-faint/60"}`}>
+              {delta(key) >= 0 ? "+" : ""}{delta(key)} (처음 대비)
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 미니 라인(스파크라인 형태) */}
+      {metrics.map(([label, key]) => {
+        const vals = snaps.map((s) => Number(s[key]));
+        const max = Math.max(1, ...vals);
+        return (
+          <div key={label}>
+            <div className="mb-1 flex items-baseline justify-between">
+              <span className="text-xs font-medium text-ink-soft">{label}</span>
+              <span className="text-xs text-ink-faint">최대 {max}</span>
+            </div>
+            <div className="flex items-end gap-0.5" style={{ height: 40 }}>
+              {vals.map((v, i) => (
+                <div key={i} className="flex-1 rounded-t bg-wine-400" style={{ height: `${Math.max(4, (v / max) * 100)}%` }} title={`${snaps[i].cycle} (${snaps[i].label}): ${v}`} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* 스냅샷 표 */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-line text-ink-faint">
+              <th className="py-1.5 text-left font-medium">시각</th>
+              <th className="text-left font-medium">사이클</th>
+              <th className="text-right font-medium">회원</th>
+              <th className="text-right font-medium">매칭</th>
+              <th className="text-right font-medium">성사</th>
+              <th className="text-right font-medium">교제</th>
+              <th className="text-right font-medium">예정</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...snaps].reverse().map((s, i) => (
+              <tr key={i} className="border-b border-line/50 text-ink-soft">
+                <td className="py-1.5">{new Date(s.taken_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} <span className="text-ink-faint/60">{s.label === "auto" ? "자동" : "수동"}</span></td>
+                <td>{s.cycle}</td>
+                <td className="text-right">{s.members}</td>
+                <td className="text-right">{s.total_matches}</td>
+                <td className="text-right">{s.accepted}</td>
+                <td className="text-right">{s.couples}</td>
+                <td className="text-right">{s.pending_pairs}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

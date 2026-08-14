@@ -75,6 +75,7 @@ export function Header() {
   );
 
   if (!user) return null;
+  if (pathname.startsWith("/ops")) return null; // 운영 콘솔은 자체 헤더 사용
 
   const handleLogout = async () => {
     await logout();
@@ -95,7 +96,7 @@ export function Header() {
             {isMember && nav("홈", "/home")}
             {isMember && nav("매칭함", "/matches", { count: actionable, dot: hasNew })}
             {nav("내 프로필", "/profile")}
-            {user.is_admin && nav("관리자", "/admin")}
+            {user.is_admin && nav("운영", "/ops")}
           </nav>
         </div>
         <div className="flex items-center gap-3">

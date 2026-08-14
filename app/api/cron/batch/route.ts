@@ -5,6 +5,7 @@ import { runBatch } from "@/lib/batch";
 import { cycleDate } from "@/lib/utils";
 import { notifyMatchesForCycle } from "@/lib/notify";
 import { pushMatchesForCycle } from "@/lib/push";
+import { recordMatchFeatures, takeSnapshot } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -25,11 +26,13 @@ export async function POST(req: NextRequest) {
   try {
     const cycle = cycleDate();
     const result = await runBatch(cycle);
+    await recordMatchFeatures(cycle).catch(() => {}); // 성사요인 기록
     // 새 매칭 알림(best-effort): 이메일 + 웹푸시
     await Promise.all([
       notifyMatchesForCycle(getSupabase(), cycle).catch(() => {}),
       pushMatchesForCycle(cycle).catch(() => {}),
     ]);
+    await takeSnapshot(cycle, "auto").catch(() => {}); // 배치 후 자동 스냅샷
     console.log(`[cron/batch] cycle=${cycle} result=${result}`); // 실행 흔적(로그로 확인)
     return ok({ ok: true, cycle, result });
   } catch (e) {
