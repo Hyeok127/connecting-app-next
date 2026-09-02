@@ -5,6 +5,7 @@ import { ok, unauthorized, forbidden } from "@/lib/http";
 import { expireOverdue } from "@/lib/batch";
 import { publicUser, publicUserWithPhotos } from "@/lib/serialize";
 import { commonConnector } from "@/lib/invite";
+import { blockedPeerIds } from "@/lib/blocks";
 import type { MatchRow, UserRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -39,16 +40,20 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // 차단 관계는 이미 성사된 매칭에도 소급 적용한다 — 차단하면 연락처·사진 공개가 멈춘다.
+  const blockedIds = await blockedPeerIds(user.id);
+
   const list: unknown[] = [];
   for (const m of matchRows) {
     const isA = m.user_a === user.id;
     const other = await getUserById(isA ? m.user_b : m.user_a);
     if (!other) continue;
+    const blocked = blockedIds.has(other.id);
     // 사진은 매칭 성사 후 양측이 모두 교환에 동의했을 때만 공개한다.
     const consented = consentByMatch.get(m.id) ?? new Set<string>();
     const myConsent = consented.has(user.id);
     const partnerConsent = consented.has(other.id);
-    const exchanged = m.state === "accepted" && myConsent && partnerConsent;
+    const exchanged = m.state === "accepted" && myConsent && partnerConsent && !blocked;
     const counterpartBase = exchanged
       ? await publicUserWithPhotos(other)
       : publicUser(other);
@@ -62,9 +67,10 @@ export async function GET(req: NextRequest) {
       my_photo_consent: myConsent,
       partner_photo_consent: partnerConsent,
       photos_exchanged: exchanged,
+      blocked,
       counterpart,
     };
-    if (m.state === "accepted") {
+    if (m.state === "accepted" && !blocked) {
       item.contact = (other as UserRow).contact; // R11
       item.common_connector = await commonConnector(m.user_a, m.user_b); // R23
     }

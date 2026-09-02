@@ -18,9 +18,13 @@ export async function POST(req: NextRequest) {
   if (!mt) return fail("진행 중인 만남이 없습니다.", 404);
 
   const sb = getSupabase();
+  // `.select("1")`은 PostgREST가 "1"이라는 컬럼 조회로 해석해 에러를 낸다.
+  // 그 에러를 구조분해에서 버리면 already가 항상 null이라 가드가 죽는다.
+  // (DB의 유니크 인덱스 feedbacks(meeting_id, from_user)가 최종 방어선이지만,
+  //  그러면 사용자에게 409 대신 원시 DB 에러가 나간다)
   const { data: already } = await sb
     .from("feedbacks")
-    .select("1")
+    .select("id")
     .eq("meeting_id", mt.id)
     .eq("from_user", user.id)
     .maybeSingle();

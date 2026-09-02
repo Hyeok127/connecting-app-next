@@ -24,3 +24,8 @@ export const LOGIN_LOCK_MS = 15 * 60 * 1000; // 실패 잠금 시간
 export const LOGIN_IP_MAX = 10; // IP당 15분 로그인 시도
 export const SIGNUP_IP_MAX = 20; // IP당 15분 가입 시도
 export const RATE_WINDOW_MS = 15 * 60 * 1000;
+
+// 인당 초대 상한 (P1-3). 별도 컬럼 없이 users.invited_by 카운트로 센다.
+// 상한이 없으면 한 사람이 다수 계정으로 추천 풀을 채울 수 있고 초대 포인트도 무한 누적된다.
+// 관리자는 예외. 폐쇄형 서비스라 너그럽게 잡되 "무제한"은 아니게 둔다.
+export const INVITE_MAX = 10;

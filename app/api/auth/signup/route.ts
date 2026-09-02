@@ -4,7 +4,7 @@ import { getSupabase } from "@/lib/supabase";
 import { createSession } from "@/lib/auth";
 import { ok, fail } from "@/lib/http";
 import { clientIp, ipAllowed } from "@/lib/ratelimit";
-import { SIGNUP_IP_MAX } from "@/lib/constants";
+import { SIGNUP_IP_MAX, INVITE_MAX } from "@/lib/constants";
 import { genId, nowMs, parseArr, PHOTO_PATH_RE, genInviteCode } from "@/lib/utils";
 import { publicUserWithPhotos } from "@/lib/serialize";
 import { cleanKeywords } from "@/lib/keywords";
@@ -41,10 +41,26 @@ export async function POST(req: NextRequest) {
 
   const { data: inviter } = await sb
     .from("users")
-    .select("id")
+    .select("id, is_admin, status")
     .eq("invite_code", String(code).trim().toUpperCase())
     .maybeSingle();
   if (!inviter) return fail("유효하지 않은 초대코드입니다.", 400); // R1
+
+  // 정지된 계정의 초대코드는 무효 (P1-3)
+  if (inviter.status === "suspended")
+    return fail("사용할 수 없는 초대코드입니다.", 400);
+
+  // 인당 초대 상한 (P1-3). 별도 컬럼 없이 invited_by 카운트로 센다.
+  // 상한이 없으면 한 사람이 다수 계정을 만들어 추천 풀을 채울 수 있고,
+  // 초대자 포인트도 무한히 누적된다. 관리자는 예외(운영상 시드 계정 생성 필요).
+  if (!inviter.is_admin) {
+    const { count: invitedCount } = await sb
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .eq("invited_by", inviter.id);
+    if ((invitedCount ?? 0) >= INVITE_MAX)
+      return fail(`이 초대코드는 최대 ${INVITE_MAX}명까지 사용할 수 있어요.`, 400);
+  }
 
   const id = genId();
   let cols: Record<string, unknown>;
@@ -130,8 +146,16 @@ export async function POST(req: NextRequest) {
     const jobRoles = parseArr(body.pref_job_roles).filter((x) => JOB_ROLES.includes(x as never));
     const regions = parseArr(body.pref_regions);
     const valuePrefs = cleanValuePrefs(body.value_prefs); // 바라는 가치관
-    const ageMin = body.pref_age_min ? Number(body.pref_age_min) : null;
-    const ageMax = body.pref_age_max ? Number(body.pref_age_max) : null;
+    // 범위가 뒤집힌 설정(min > max)은 후보를 0으로 만들고, 사용자는 "추천이 없다"만 보게 된다.
+    // 잘못된 값은 거절하지 않고 무시한다 — 가입 마지막 단계에서 튕기는 것보다 낫다.
+    const prefAge = (v: unknown): number | null => {
+      if (v == null || v === "") return null;
+      const n = Math.trunc(Number(v));
+      return Number.isFinite(n) && n >= 19 && n <= 99 ? n : null;
+    };
+    let ageMin = prefAge(body.pref_age_min);
+    let ageMax = prefAge(body.pref_age_max);
+    if (ageMin != null && ageMax != null && ageMin > ageMax) [ageMin, ageMax] = [ageMax, ageMin];
     // genders는 위에서 필수 검증했으므로 preferences 행은 항상 만든다.
     {
       await sb.from("preferences").insert({
