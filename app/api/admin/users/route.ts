@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authFromToken, bearerToken } from "@/lib/auth";
 import { ok, unauthorized, forbidden } from "@/lib/http";
 import { parseJsonArray } from "@/lib/serialize";
-import { parseValues, parseValuePrefs } from "@/lib/values";
+import { parseValues, parseValuePrefs, acceptedOnly } from "@/lib/values";
 import type { PreferencesRow, UserRow } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -60,7 +60,11 @@ export async function GET(req: NextRequest) {
             job_types: Array.isArray(p.job_types) ? p.job_types : [],
             job_roles: Array.isArray(p.job_roles) ? p.job_roles : [],
             regions: parseJsonArray(p.regions),
-            value_prefs: parseValuePrefs(p.value_prefs ?? p.workplaces),
+            // 관리자 화면은 기존 표시 형식(dim → 허용값 배열)을 유지한다. 중요도는 별도 필드로 내려준다.
+            value_prefs: acceptedOnly(parseValuePrefs(p.value_prefs ?? p.workplaces)),
+            value_pref_importance: Object.fromEntries(
+              Object.entries(parseValuePrefs(p.value_prefs ?? p.workplaces)).map(([k, v]) => [k, v.importance])
+            ),
           }
         : null,
     };

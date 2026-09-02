@@ -72,7 +72,7 @@ export interface PreferencesRow {
   job_roles: string[] | null; // 바라는 직무
   /** @deprecated 005에서 value_prefs로 이관. 006에서 삭제 예정 */
   workplaces: string;
-  value_prefs: Record<string, string[]> | null; // 상대에게 바라는 가치관
+  value_prefs: Record<string, unknown> | null; // 상대에게 바라는 가치관 + 중요도(lib/values.ts ValuePrefs)
   regions: string;
   mbtis: string;
   updated_at: number;

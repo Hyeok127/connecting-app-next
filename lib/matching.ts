@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { MAX_RANK } from "@/lib/constants";
 import type { PreferencesRow, UserRow } from "@/lib/types";
 import { parseJsonArray } from "@/lib/serialize";
-import { parseValues, parseValuePrefs, valuePreferenceScore, satisfiedPrefReasons } from "@/lib/values";
+import { parseValues, parseValuePrefs, valuePreferenceScore, satisfiedPrefReasons, violatesDealbreaker, type ValuePrefs } from "@/lib/values";
 import { regionCovers } from "@/lib/profileOptions";
 import { cycleDate } from "@/lib/utils";
 import keywordVectors from "@/lib/keyword_vectors.json";
@@ -184,7 +184,7 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
   for (const r of (myRanks.data as { target_id: string }[]) ?? [])
     rankCount.set(r.target_id, (rankCount.get(r.target_id) ?? 0) + 1);
   const prefsMap = new Map<string, Prefs>();
-  const valuePrefsMap = new Map<string, Record<string, string[]>>();
+  const valuePrefsMap = new Map<string, ValuePrefs>();
   for (const p of (allPrefs.data as PreferencesRow[]) ?? []) {
     prefsMap.set(p.user_id, rowToPrefs(p));
     valuePrefsMap.set(p.user_id, parseValuePrefs(p.value_prefs ?? p.workplaces));
@@ -201,6 +201,10 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
     if (!fits(prefsMap.get(u.id) ?? null, me, u)) continue; // R6 (상호)
     const uKw = parseJsonArray(u.keywords);
     const uVals = parseValues(u.life_values ?? u.workplace);
+    // 절대조건(importance=3) 위반은 양방향으로 제외한다.
+    // 나머지 중요도는 아래 valueBonus에서 가중 가산으로만 반영된다.
+    if (violatesDealbreaker(myValuePrefs, uVals)) continue;
+    if (violatesDealbreaker(valuePrefsMap.get(u.id) ?? {}, myVals)) continue;
     // 키워드는 유사할수록, 가치관은 "내가 바라는 조건을 상대가 충족"할수록(상호) 가산.
     const valueBonus =
       valuePreferenceScore(myValuePrefs, uVals) +

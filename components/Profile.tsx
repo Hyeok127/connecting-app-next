@@ -9,6 +9,7 @@ import { Avatar, Badge, KeywordChips, ValueChips, Spinner, Empty } from "@/compo
 import { KeywordPicker } from "@/components/KeywordPicker";
 import { ValuesSurvey } from "@/components/ValuesSurvey";
 import { ValuePrefSurvey } from "@/components/ValuePrefSurvey";
+import type { ValuePrefs } from "@/lib/values";
 import { ChipSelect } from "@/components/ChipSelect";
 import { RegionPicker } from "@/components/RegionPicker";
 import { JOB_TYPES, JOB_ROLES } from "@/lib/profileOptions";
@@ -34,7 +35,7 @@ export function Profile() {
   const [invite, setInvite] = useState<{ code: string; link: string } | null>(null);
   const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [stats, setStats] = useState<{ invited: number; matched: number }>({ invited: 0, matched: 0 });
-  const [valuePrefs, setValuePrefs] = useState<Record<string, string[]>>({});
+  const [valuePrefs, setValuePrefs] = useState<ValuePrefs>({});
   const [prefs, setPrefs] = useState<{
     genders: string[];
     age_min: number | null;
@@ -56,7 +57,7 @@ export function Profile() {
       const [inv, invs, pr, em] = await Promise.all([
         api<{ code: string; link: string }>("/invite"),
         api<{ invitees: Invitee[]; stats: { invited: number; matched: number } }>("/me/invitees"),
-        api<{ preferences: typeof prefs; valuePrefs: Record<string, string[]> }>("/me/preferences"),
+        api<{ preferences: typeof prefs; valuePrefs: ValuePrefs }>("/me/preferences"),
         api<{ email: string | null }>("/me/email"),
       ]);
       setInvite(inv);
@@ -226,7 +227,7 @@ export function Profile() {
 
       {isMember && (
         <div className="mt-6">
-          <ProfileMeter user={user} email={email} hasValuePrefs={Object.values(valuePrefs).some((a) => a.length > 0)} />
+          <ProfileMeter user={user} email={email} hasValuePrefs={Object.values(valuePrefs).some((p) => p.accepted.length > 0)} />
         </div>
       )}
 
