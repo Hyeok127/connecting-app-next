@@ -56,6 +56,9 @@ export async function POST(req: NextRequest) {
       return fail("성별을 선택해주세요.", 400);
     if (!age || age < 19 || age > 99)
       return fail("나이를 확인해주세요.", 400);
+    // 만나고 싶은 성별은 필수 — 유저 행을 만들기 전에 검증해 고아 계정을 남기지 않는다.
+    if (parseArr(body.pref_genders).filter((g) => ["남성", "여성"].includes(g)).length === 0)
+      return fail("만나고 싶은 성별을 선택해주세요.", 400);
     const cleanKw = cleanKeywords(keywords);
     if (cleanKw.length < 1)
       return fail("나를 나타내는 키워드를 1개 이상 골라주세요.", 400);
@@ -118,7 +121,9 @@ export async function POST(req: NextRequest) {
     return fail(error.message, 400);
   }
 
-  // 가입 시 선호 조건 (선택, R24) — 성별/나이/직업/지역 하드 필터 + 바라는 가치관.
+  // 가입 시 선호 조건 — 성별만 필수(R24의 예외), 나머지는 선택.
+  // 성별을 선택으로 두면 preferences 행 자체가 안 생기고, 그러면 fits()가 성별을
+  // 이성으로 폴백할 뿐 사용자가 원하는 값을 알 수 없다. 한 번은 반드시 받는다.
   if (role === "member") {
     const genders = parseArr(body.pref_genders).filter((g) => ["남성", "여성"].includes(g));
     const jobTypes = parseArr(body.pref_job_types).filter((x) => JOB_TYPES.includes(x as never));
@@ -127,7 +132,8 @@ export async function POST(req: NextRequest) {
     const valuePrefs = cleanValuePrefs(body.value_prefs); // 바라는 가치관
     const ageMin = body.pref_age_min ? Number(body.pref_age_min) : null;
     const ageMax = body.pref_age_max ? Number(body.pref_age_max) : null;
-    if (genders.length || ageMin || ageMax || jobTypes.length || jobRoles.length || regions.length || Object.keys(valuePrefs).length) {
+    // genders는 위에서 필수 검증했으므로 preferences 행은 항상 만든다.
+    {
       await sb.from("preferences").insert({
         user_id: id,
         genders: JSON.stringify(genders),

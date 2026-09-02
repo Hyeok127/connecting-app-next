@@ -266,8 +266,11 @@ export function AuthPage() {
             </div>
 
             <div className="rounded-xl border border-line bg-cream/50 p-4">
-              <p className="text-sm font-medium text-ink-soft">상대방 선호 조건 (선택)</p>
-              <div className="mt-2 flex gap-4 text-sm text-ink-soft">
+              <p className="text-sm font-medium text-ink-soft">상대방 선호 조건</p>
+              <p className="mt-2 text-sm font-medium text-ink-soft">
+                만나고 싶은 성별 <span className="text-wine-600">(필수)</span>
+              </p>
+              <div className="mt-1 flex gap-4 text-sm text-ink-soft">
                 <label className="flex items-center gap-1">
                   <input type="checkbox" name="pref_genders" value="남성" /> 남성
                 </label>
@@ -275,6 +278,7 @@ export function AuthPage() {
                   <input type="checkbox" name="pref_genders" value="여성" /> 여성
                 </label>
               </div>
+              <p className="mt-3 text-sm font-medium text-ink-soft">아래는 전부 선택이에요.</p>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <input name="pref_age_min" type="number" placeholder="최소 나이" className={inputCls} />
                 <input name="pref_age_max" type="number" placeholder="최대 나이" className={inputCls} />
