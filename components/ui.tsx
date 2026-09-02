@@ -1,5 +1,6 @@
 // components/ui.tsx — 공용 UI 요소
 "use client";
+import { VALUE_DIMENSIONS } from "@/lib/values";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "활동",
@@ -75,12 +76,11 @@ export function MatchStrength({ strength }: { strength: number }) {
   );
 }
 
-const VALUE_LABEL: Record<string, string> = {
-  smoke: "흡연",
-  drink: "음주",
-  tattoo: "문신",
-  religion: "종교",
-};
+// 라벨을 손으로 복제해두면 VALUE_DIMENSIONS에 축을 추가할 때 조용히 어긋난다
+// (키가 그대로 노출된다). 정의 한 곳에서 파생시킨다.
+const VALUE_LABEL: Record<string, string> = Object.fromEntries(
+  VALUE_DIMENSIONS.map((d) => [d.key, d.label])
+);
 
 // 가치관 설문 값(흡연/음주/문신/종교)을 작은 라벨 칩으로 표시.
 export function ValueChips({ values }: { values?: Record<string, string> }) {

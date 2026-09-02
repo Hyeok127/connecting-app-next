@@ -3,7 +3,7 @@ import { getSupabase } from "@/lib/supabase";
 import { MAX_RANK } from "@/lib/constants";
 import type { PreferencesRow, UserRow } from "@/lib/types";
 import { parseJsonArray } from "@/lib/serialize";
-import { parseValues, parseValuePrefs, valuePreferenceScore, satisfiedPrefReasons, violatesDealbreaker, type ValuePrefs } from "@/lib/values";
+import { parseValues, parseValuePrefs, valuePreferenceScore, satisfiedPrefReasons, violatesDealbreaker, intentConflict, type ValuePrefs } from "@/lib/values";
 import { regionCovers } from "@/lib/profileOptions";
 import { cycleDate } from "@/lib/utils";
 import keywordVectors from "@/lib/keyword_vectors.json";
@@ -201,6 +201,8 @@ export async function recommendationsFor(meId: string, me: UserRow): Promise<Rec
     if (!fits(prefsMap.get(u.id) ?? null, me, u)) continue; // R6 (상호)
     const uKw = parseJsonArray(u.keywords);
     const uVals = parseValues(u.life_values ?? u.workplace);
+    // 관계 지향이 정면충돌(진지 ↔ 가볍게)하면 사용자 설정과 무관하게 제외한다.
+    if (intentConflict(myVals, uVals)) continue;
     // 절대조건(importance=3) 위반은 양방향으로 제외한다.
     // 나머지 중요도는 아래 valueBonus에서 가중 가산으로만 반영된다.
     if (violatesDealbreaker(myValuePrefs, uVals)) continue;

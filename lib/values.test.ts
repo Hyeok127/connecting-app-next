@@ -13,6 +13,10 @@ import {
   violatesDealbreaker,
   acceptedOnly,
   MAX_DEALBREAKERS,
+  intentConflict,
+  INTENT_SERIOUS,
+  INTENT_NATURAL,
+  INTENT_CASUAL,
 } from "./values.ts";
 
 test("구형 배열 저장분을 importance 1로 승격한다 (마이그레이션 불필요)", () => {
@@ -100,4 +104,37 @@ test("parseValuePrefs는 JSON 문자열·객체·null을 모두 받는다", () =
 test("acceptedOnly는 관리자 화면용 구형 형식을 그대로 재현한다", () => {
   const p = cleanValuePrefs({ smoke: { accepted: ["비흡연"], importance: 3 } });
   assert.deepEqual(acceptedOnly(p), { smoke: ["비흡연"] });
+});
+
+// ── 관계 지향(intent) ──
+
+test("진지한 만남 ↔ 가볍게는 정면충돌로 막는다 (양방향)", () => {
+  const serious = { intent: INTENT_SERIOUS };
+  const casual = { intent: INTENT_CASUAL };
+  assert.equal(intentConflict(serious, casual), true);
+  assert.equal(intentConflict(casual, serious), true);
+});
+
+test("'자연스럽게'는 양쪽 모두와 매칭 가능 — 멀티모드의 연결고리", () => {
+  const natural = { intent: INTENT_NATURAL };
+  assert.equal(intentConflict(natural, { intent: INTENT_SERIOUS }), false);
+  assert.equal(intentConflict(natural, { intent: INTENT_CASUAL }), false);
+});
+
+test("같은 지향끼리는 당연히 충돌하지 않는다", () => {
+  assert.equal(intentConflict({ intent: INTENT_SERIOUS }, { intent: INTENT_SERIOUS }), false);
+  assert.equal(intentConflict({ intent: INTENT_CASUAL }, { intent: INTENT_CASUAL }), false);
+});
+
+test("한쪽이라도 미응답이면 막지 않는다 (후보풀 붕괴 방지)", () => {
+  assert.equal(intentConflict({ intent: INTENT_SERIOUS }, {}), false);
+  assert.equal(intentConflict({}, { intent: INTENT_CASUAL }), false);
+  assert.equal(intentConflict({}, {}), false);
+});
+
+test("intent도 다른 가치관 축과 똑같이 3단 구조를 물려받는다", () => {
+  const p = cleanValuePrefs({ intent: { accepted: [INTENT_SERIOUS], importance: 3 } });
+  assert.deepEqual(p.intent, { accepted: [INTENT_SERIOUS], importance: 3 });
+  assert.equal(violatesDealbreaker(p, { intent: INTENT_CASUAL }), true);
+  assert.equal(violatesDealbreaker(p, { intent: INTENT_SERIOUS }), false);
 });

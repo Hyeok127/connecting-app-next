@@ -15,7 +15,27 @@ export interface ValueDimension {
 
 const O = (value: string, label?: string): ValueOption => ({ value, label: label ?? value });
 
+// 관계 지향(intent)을 맨 앞에 둔다. 종료 사유 1위가 "가치관 차이"인데(CLOSE_REASONS)
+// 정작 "무엇을 위한 만남인가"를 묻는 축이 없었다.
+//
+// 별도 컬럼(users.intent)을 만들지 않고 life_values(jsonb)의 한 축으로 넣은 이유:
+// DDL 없이 즉시 쓸 수 있고, 「나의 것」/「상대에게 바라는 것」/중요도 3단 구조를
+// 다른 가치관 축과 똑같이 물려받기 때문이다. 다만 아래 intentConflict()로
+// 정면충돌 조합만은 사용자 설정과 무관하게 항상 막는다.
+export const INTENT_SERIOUS = "진지한 만남";
+export const INTENT_NATURAL = "자연스럽게";
+export const INTENT_CASUAL = "가볍게";
+
 export const VALUE_DIMENSIONS: ValueDimension[] = [
+  {
+    key: "intent",
+    label: "찾는 만남",
+    options: [
+      O(INTENT_SERIOUS, "진지한 만남 (결혼을 염두에 둠)"),
+      O(INTENT_NATURAL, "좋은 사람이면 자연스럽게"),
+      O(INTENT_CASUAL, "가볍게 알아가기·친구부터"),
+    ],
+  },
   {
     key: "smoke",
     label: "흡연",
@@ -64,6 +84,21 @@ export function parseValues(s?: string | Record<string, unknown> | null): Record
   } catch {
     return {};
   }
+}
+
+// 관계 지향이 정면충돌하는 조합은 사용자 설정과 무관하게 항상 막는다.
+// "진지한 만남(결혼 염두)"과 "가볍게 알아가기"는 목적이 반대라 서로에게 손해다.
+// "자연스럽게"는 양쪽 모두와 가능 — 이게 멀티모드를 한 서비스에서 굴리는 최소 규칙이다.
+//
+// 둘 중 하나라도 답하지 않았으면 막지 않는다. 가치관 설문이 선택 항목이라
+// 미응답자를 배제하면 후보풀이 무너진다(violatesDealbreaker와 같은 원칙).
+export function intentConflict(a: Record<string, string>, b: Record<string, string>): boolean {
+  const x = a.intent;
+  const y = b.intent;
+  if (!x || !y) return false;
+  return (
+    (x === INTENT_SERIOUS && y === INTENT_CASUAL) || (x === INTENT_CASUAL && y === INTENT_SERIOUS)
+  );
 }
 
 // ── 상대에게 바라는 가치관(선호) + 중요도 ──
