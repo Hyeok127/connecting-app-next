@@ -165,12 +165,13 @@
 
 | # | 문제 | 증거 | 처방 |
 |---|---|---|---|
-| **P6-1** | **마이그레이션 적용 상태를 아무 데서도 추적하지 않는다** | `schema_migrations` 류 테이블 없음. `apply_migration.mjs`는 `console.log`만 하고 기록을 남기지 않음. 적용 여부가 **`STATUS.md` 산문**("dev/prod 적용 완료")에만 존재 | `schema_migrations(version, checksum, applied_at)` + `apply_migration.mjs`가 기록. **`/api/health`가 미적용 목록을 노출** — 이미 있는 엔드포인트라 가장 싸다 |
-| **P6-2** | **CI가 없다** | `.github/workflows/` 부재. `npm test`·`lint`·`build`가 어디서도 자동 실행되지 않음 | GitHub Actions: push(dev·main) + PR에서 `npm ci && lint && test && build` |
-| **P6-3** | **`main` 브랜치 보호가 없다** | `gh api .../branches/main/protection` → 404 "Branch not protected". PR 이력 **0건**, 전부 직접 push | 최소한 "CI 통과 필수". 1인 개발이라 "PR 필수"는 과할 수 있음 |
-| **P6-4** | **로컬 `main`이 썩는다 — 판단을 6배 틀리게 만든다** | 이 체크아웃의 로컬 `main`=`e47c301`(8/09), `origin/main`=`e177b74`(8/14). `git log main..dev`가 **51**, `origin/main..dev`는 **8**. 이 세션에서 실제로 오판했다 | CLAUDE.md에 "비교는 항상 `origin/main` 기준" 명시. `git fetch` 없이 판단 금지 |
-| **P6-5** | **롤백 절차가 문서에 없다** | `main` push = 즉시 프로덕션인데 되돌리는 방법이 CLAUDE.md·README 어디에도 없음 | Vercel Instant Rollback 절차 3줄 추가 |
-| **P6-6** | 미적용 마이그레이션이 파일만 봐선 구분되지 않는다 | `006_cleanup`은 의도적 보류, `011`은 신규 미적용 — 둘 다 파일에 표시가 없어 `STATUS.md`를 읽어야 안다 | 파일 상단 상태 주석 규약. P6-1이 해결되면 자동 해소 |
+| **P6-1** ✅ | **마이그레이션 적용 상태를 아무 데서도 추적하지 않는다** | `schema_migrations` 류 테이블 없음. `apply_migration.mjs`는 `console.log`만 하고 기록을 남기지 않음. 적용 여부가 **`STATUS.md` 산문**("dev/prod 적용 완료")에만 존재 | **완료** `531515b` — `012_schema_migrations.sql` + `apply_migration.mjs` 기록 + `/api/health`의 `migrations.pending`/`orphan`. ⚠️ **012를 DB에 적용해야 추적이 시작된다** |
+| **P6-2** ⏸ | **CI가 없다** | `.github/workflows/` 부재. `npm test`·`lint`·`build`가 어디서도 자동 실행되지 않음 | **로컬 커밋됨** `8f3bb37` — 푸시가 `workflow` 스코프 부족으로 거부됨. `gh auth refresh -h github.com -s workflow` 후 push 필요 |
+| **P6-3** ◐ | **`main` 브랜치 보호가 없다** | `gh api .../branches/main/protection` → 404 "Branch not protected". PR 이력 **0건**, 전부 직접 push | **부분 완료** — force push·삭제 차단 적용(2026-09-02). 직접 push는 유지해 릴리스 흐름 무영향. **CI 통과 필수는 워크플로가 한 번 돌아 `verify` 체크가 생긴 뒤에** (명령은 CLAUDE.md에) |
+| **P6-4** ✅ | **로컬 `main`이 썩는다 — 판단을 6배 틀리게 만든다** | 이 체크아웃의 로컬 `main`=`e47c301`(8/09), `origin/main`=`e177b74`(8/14). `git log main..dev`가 **51**, `origin/main..dev`는 **8**. 이 세션에서 실제로 오판했다 | **완료** — CLAUDE.md "브랜치 비교는 반드시 `origin/main` 기준으로" 절 추가 |
+| **P6-5** ✅ | **롤백 절차가 문서에 없다** | `main` push = 즉시 프로덕션인데 되돌리는 방법이 CLAUDE.md·README 어디에도 없음 | **완료** — CLAUDE.md "롤백" 절 추가. Vercel Instant Rollback → git revert 순. **DB는 롤백되지 않는다**는 점 명시 |
+| **P6-6** ✅ | 미적용 마이그레이션이 파일만 봐선 구분되지 않는다 | `006_cleanup`은 의도적 보류, `011`은 신규 미적용 — 둘 다 파일에 표시가 없어 `STATUS.md`를 읽어야 안다 | **완료** — P6-1이 해소. `/api/health`가 실제 DB 상태로 답한다 |
+| **P6-8** ✅ | `README`가 없는 `.env.example`을 복사하라고 안내 | `cp .env.example .env.local`(README:31)인데 파일이 없었다. `.gitignore`의 `.env*`가 예제까지 잡고 있었다 | **완료** — `.env.example` 생성 + `!.env.example` 예외 추가 |
 | **P6-7** | `dev`→`main`이 fast-forward라 **부분 릴리스가 불가능** | `main` 이력에 머지 커밋 0건(완전 선형) | 지금 규모에선 문제 아님. 다만 "핫픽스만 먼저" 상황에 대비해 **핫픽스는 `main`에서 분기 → 양쪽 반영** 규칙만 정해둘 것 |
 
 > **P6-1이 가장 깊은 결함이다.** 코드 배포(git push → Vercel)와 스키마 변경(수동 Management API)이

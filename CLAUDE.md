@@ -57,6 +57,52 @@ dev 변경을 배포 전 휴대폰에서 볼 때, 노트북(nt9)에서 프로덕
 - 데스크탑 crontab의 `git pull origin main`도 그대로다. 데스크탑 체크아웃은 운영 코드를
   미러링하는 용도라 `main`을 보는 게 맞다. **즉 dev에만 있는 변경은 데스크탑에 안 내려간다.**
 - 2026-08-09 실측: `dev` push(`238a01e`) → `Preview` 배포 생성, Production 무변동 확인.
+- 2026-09-02 재확인: dev push 6건이 전부 Preview만 생성, Production 무변동. 전략은 설계대로 동작한다.
+
+### ⚠️ 브랜치 비교는 반드시 `origin/main` 기준으로 (2026-09-02)
+
+**로컬 `main`은 자동으로 갱신되지 않는다.** `git fetch`는 `origin/main`만 움직이고 로컬 `main`은
+그대로 둔다. 데스크탑 crontab이 `git pull origin main`을 도는 건 **데스크탑뿐이라**,
+다른 기기의 로컬 `main`은 마지막으로 체크아웃한 시점에 멈춰 있다.
+
+```bash
+git fetch origin
+git log --oneline origin/main..dev     # ✅ 이게 진짜 미배포 목록
+git log --oneline main..dev            # ❌ 로컬 main이 낡았으면 엉뚱한 값
+```
+
+실측 사고(2026-09-02): 이 저장소에서 `main..dev`는 **51커밋**, `origin/main..dev`는 **8커밋**이었다.
+로컬 `main`이 8/09에 멈춰 있어서 "운영이 44커밋 뒤처졌다"는 잘못된 결론이 나왔고,
+그 값이 문서 3개에 그대로 적혔다. **판단 전에 `git fetch`, 비교는 `origin/` 접두사로.**
+
+### 롤백 — `main` push는 즉시 프로덕션이다 (2026-09-02)
+
+되돌리는 방법이 문서에 없었다. 빠른 순서대로:
+
+1. **Vercel Instant Rollback (가장 빠름, 코드 무변경)** — Vercel 대시보드 → Deployments →
+   직전 정상 배포 → `⋯` → **Promote to Production**. 빌드 없이 즉시 전환된다.
+2. **git revert 후 push** — 이력을 남기는 정공법. `git revert <sha> && git push origin main`.
+   재빌드가 필요해 1보다 느리다.
+3. **⚠️ DB는 롤백되지 않는다.** 마이그레이션을 적용한 뒤라면 코드만 되돌려도 스키마는 그대로다.
+   되돌리려면 역방향 SQL을 따로 써야 한다 — 그래서 마이그레이션은 **가급적 컬럼 추가만** 하고
+   삭제는 충분히 안정화된 뒤에 한다(`006_cleanup`을 의도적으로 미뤄둔 이유).
+
+`main`은 force push와 삭제가 차단돼 있다(2026-09-02 설정). 직접 push는 그대로 가능하다.
+
+### 마이그레이션 적용 상태 (2026-09-02 — 추적 도입)
+
+**코드 배포와 스키마 변경은 별개 파이프라인이다.** `main`에 머지해도 DB는 바뀌지 않는다.
+
+- 적용 이력은 `schema_migrations` 테이블에 있다(`012_schema_migrations.sql`).
+- `scripts/apply_migration.mjs`가 적용 성공 시 sha256과 함께 기록한다.
+- **미적용 목록은 `GET /api/health`의 `migrations.pending`으로 확인한다.**
+  배포 후 여기가 비어 있지 않으면 사람이 손을 대야 한다는 뜻이다.
+- `orphan`은 DB에는 기록이 있는데 저장소에 파일이 없는 경우 — 다른 브랜치 흔적일 수 있다.
+
+```bash
+curl -s https://connecting-app-next.vercel.app/api/health | jq .migrations
+node scripts/apply_migration.mjs supabase/migrations/0XX_*.sql .env.local.prod.bak
+```
 
 ## 기기 배치 (2026-08-09 기준)
 
@@ -216,13 +262,37 @@ Supabase 프로젝트가 두 개다. **둘 다 같은 조직(Hyeok127's Org) 안
 ```bash
 npm ci          # package-lock.json 기준 (pnpm/yarn 아님, npm 고정)
 npm run dev
-npm run lint && npm run build && bash scripts/smoke_run.sh
+npm run lint && npm test && npm run build && bash scripts/smoke_run.sh
 ```
 
 Node는 **22.22.2**로 맞춘다(데스크탑 기준, nt9는 nvm으로 동일 버전 고정). npm이 12로
 올리라고 권해도 무시한다 — 기기 간 lockfile 해석 차이를 만들지 않기 위해서다.
 `smoke_run.sh`는 더미 Supabase 값으로 서버를 띄워 401/렌더링만 보는 것이라 실데이터를
 건드리지 않는다.
+
+### 자동화 테스트 (2026-09-02 도입)
+
+`npm test` = `node --experimental-strip-types --test "lib/**/*.test.ts"` — **실 DB가 필요 없다.**
+기존 `scripts/smoke_*.mjs` 6종은 전부 실 DB를 요구해서 자격증명이 없는 기기에서는
+어떤 로직도 검증할 수 없었다. 순수 함수부터 테스트를 붙여 나간다(현재 `lib/values`·`lib/migrations`).
+
+- 테스트 파일은 `lib/*.test.ts`. `node:test` + `node:assert/strict`.
+- **`@/` 경로 별칭을 쓰는 모듈은 테스트할 수 없다** — 별칭은 번들러 기능이라 node가 못 푼다.
+  그래서 판정 로직은 DB·fs 접근에서 분리해 순수 모듈로 두는 편이 좋다(`lib/migrations.ts`가 그 예).
+- 임포트는 확장자를 붙인다(`./values.ts`). 이를 위해 tsconfig에 `allowImportingTsExtensions`를 켰다.
+
+### CI (2026-09-02 도입)
+
+`.github/workflows/ci.yml` — `dev`·`main` push와 PR에서 `npm ci → lint → test → build → smoke`.
+`supabase/migrations/`가 바뀌면 "배포만으로는 반영되지 않는다"는 경고를 함께 남긴다.
+
+`main`은 force push·삭제가 차단돼 있다. **CI 통과를 필수 조건으로 걸려면** 워크플로가 한 번
+돌아 상태 체크 이름(`verify`)이 생긴 뒤에 아래를 실행한다:
+
+```bash
+gh api -X PATCH repos/Hyeok127/connecting-app-next/branches/main/protection/required_status_checks \
+  -f strict=true -f 'contexts[]=verify'
+```
 
 ## 레거시 — `~/Connecting/connecting-app`, `connecting-app-dev`
 
