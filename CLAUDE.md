@@ -286,13 +286,46 @@ Node는 **22.22.2**로 맞춘다(데스크탑 기준, nt9는 nvm으로 동일 �
 `.github/workflows/ci.yml` — `dev`·`main` push와 PR에서 `npm ci → lint → test → build → smoke`.
 `supabase/migrations/`가 바뀌면 "배포만으로는 반영되지 않는다"는 경고를 함께 남긴다.
 
-`main`은 force push·삭제가 차단돼 있다. **CI 통과를 필수 조건으로 걸려면** 워크플로가 한 번
-돌아 상태 체크 이름(`verify`)이 생긴 뒤에 아래를 실행한다:
+### `main` 브랜치 보호 (2026-09-02 적용)
+
+| 항목 | 설정 | 이유 |
+|---|---|---|
+| force push | **차단** | 프로덕션 브랜치 이력을 되돌릴 수 없게 |
+| 브랜치 삭제 | **차단** | 사고 방지 |
+| 필수 상태 체크 | **`verify`** (CI) | 검증 안 된 코드가 프로덕션에 못 가게 |
+| strict (up-to-date 강제) | 꺼짐 | FF 릴리스 모델에선 불필요하고 마찰만 는다 |
+| PR 필수 | 꺼짐 | 1인 개발. 직접 push를 유지해 기존 릴리스 흐름을 깨지 않는다 |
+| 관리자 예외 | 허용 | 장애 시 소유자가 우회할 수 있게 |
+
+**릴리스가 막히지 않는 이유**: `dev` → `main`은 fast-forward라 **SHA가 같다.**
+dev push 때 통과한 `verify` 체크가 그대로 인정된다(2026-09-02 실측 확인).
+바꿔 말하면 **CI가 실패한 커밋은 main에 못 올라간다** — 그게 이 설정의 목적이다.
+
+설정을 바꾸려면:
 
 ```bash
-gh api -X PATCH repos/Hyeok127/connecting-app-next/branches/main/protection/required_status_checks \
-  -f strict=true -f 'contexts[]=verify'
+gh api repos/Hyeok127/connecting-app-next/branches/main/protection            # 현재 설정 확인
+gh api -X DELETE repos/Hyeok127/connecting-app-next/branches/main/protection  # 전체 해제(비상시)
 ```
+
+### ⚠️ git 자격증명 — 워크플로 파일 push는 PAT가 필요하다 (2026-09-02)
+
+`~/.gitconfig`가 github.com용 헬퍼 목록을 빈 값으로 초기화한 뒤 `gh auth git-credential`만
+남겨 둬서, git이 항상 **gh의 OAuth 토큰(`gho_`)**을 쓴다. 이 토큰에는 `workflow` 스코프가 없어
+`.github/workflows/` 를 건드리는 push가 거부된다:
+
+```
+! [remote rejected] refusing to allow an OAuth App to create or update workflow ... without `workflow` scope
+```
+
+`~/.git-credentials`에는 `repo, workflow`를 가진 PAT(`ghp_`)가 이미 들어 있다.
+그 push만 `store` 헬퍼로 강제하면 된다:
+
+```bash
+git -c credential.helper= -c credential.helper=store push origin dev
+```
+
+(첫 빈 값이 헬퍼 목록을 리셋하고 `store`만 남긴다. 설정을 영구 변경하지 않는다.)
 
 ## 레거시 — `~/Connecting/connecting-app`, `connecting-app-dev`
 
