@@ -319,14 +319,12 @@ export function Matches() {
                     ) : (
                       <div className="space-y-2">
                         <p className="text-sm text-ink-faint">응답 마감까지 {hours}시간 {mins}분</p>
-                        {!contactInput[m.id] && (
-                          <input
-                            value={contactInput[m.id] ?? ""}
-                            onChange={(e) => setContactInput((s) => ({ ...s, [m.id]: e.target.value }))}
-                            placeholder="연락처 (카톡ID 또는 전화번호)"
-                            className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-wine-500 focus:ring-2 focus:ring-wine-100"
-                          />
-                        )}
+                        <input
+                          value={contactInput[m.id] ?? ""}
+                          onChange={(e) => setContactInput((s) => ({ ...s, [m.id]: e.target.value }))}
+                          placeholder="연락처 (카톡ID 또는 전화번호)"
+                          className="w-full rounded-lg border border-line px-3 py-2 text-sm outline-none transition focus:border-wine-500 focus:ring-2 focus:ring-wine-100"
+                        />
                         <div className="flex gap-2">
                           <button
                             onClick={() => respond(m.id, "accept")}

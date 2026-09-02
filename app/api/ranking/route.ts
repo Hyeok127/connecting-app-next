@@ -60,13 +60,15 @@ export async function PUT(req: NextRequest) {
 
   const today = cycleDate();
   const sb = getSupabase();
-  const { data: already } = await sb
+  // R8: 하루 1회. rankings PK가 (user_id, cycle_date, target_id)라 한 사이클에
+  // 여러 행이 존재한다 — maybeSingle()은 다중행에서 에러가 나므로 count로 센다.
+  const { count: alreadyCount, error: alreadyErr } = await sb
     .from("rankings")
-    .select("1")
+    .select("target_id", { count: "exact", head: true })
     .eq("user_id", user.id)
-    .eq("cycle_date", today)
-    .maybeSingle();
-  if (already) return fail("오늘의 순위는 이미 확정했습니다.", 409); // R8
+    .eq("cycle_date", today);
+  if (alreadyErr) return fail("순위 확인에 실패했습니다. 잠시 후 다시 시도해주세요.", 500);
+  if ((alreadyCount ?? 0) > 0) return fail("오늘의 순위는 이미 확정했습니다.", 409);
 
   const ids = parseArr(body.target_ids).slice(0, MAX_RANK);
   if (ids.length === 0) return fail("순위를 1명 이상 지정해주세요.", 400);

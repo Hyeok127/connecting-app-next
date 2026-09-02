@@ -28,7 +28,7 @@ language sql as $$
     from meetings mt
     join matches m on m.id = mt.match_id
     where mt.status='active'
-      and mt.started_at < (extract(epoch from now()) * 1000)::bigint - 30 * 86400000
+      and mt.started_at < (extract(epoch from now()) * 1000)::bigint - 30::bigint * 86400000
   ),
   upd_meet as (
     update meetings set status='closed',
